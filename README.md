@@ -201,3 +201,10 @@ make test-linuxcnc
 Licencja: **GPL-2.0-or-later dla własnego kodu**. Kod LinuxCNC/QtDragon zachowuje swoje nagłówki i licencję GPL-2.0; szczegóły w [LICENSE](LICENSE) i [rejestrze pochodzenia](docs/PROVENANCE.md). Licencja katalogu nadrzędnego nie dotyczy linumeRT.
 
 Ekran nie zastępuje sprzętowego E-STOP/STO. **NIEZWERYFIKOWANE NA SPRZĘCIE.**
+
+
+## Aplikacja Android (APK)
+Instalowalny klient WebHMI: [instrukcja i pobieranie APK](android/webhmi/README.md)
+oraz [workflow budowania na GitHub](.github/workflows/android-apk.yml).
+Aplikacja łączy się z serwerem WebHMI, nie uruchamia LinuxCNC na telefonie;
+nie zastępuje sprzętowego E-STOP ani niezależnego watchdog.

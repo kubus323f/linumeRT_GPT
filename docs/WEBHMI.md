@@ -212,3 +212,12 @@ Przyrost może zostać przerwany przez STOP. Wcześniejsze ograniczenia watchdog
 
 Odbiór Pythona, Node, przeglądarki i LinuxCNC raportowany osobno w PR sprintu i #181;
 atrapa ani testy mapowania nie zastępują dowodu rzeczywistego LinuxCNC.
+
+
+## Android WebHMI (APK, fork kubus323f)
+Klient Android 10+ i 16/HyperOS 3 na bazie WebView jest w \`android/webhmi\`.
+Instalację z artefaktu GitHub Actions i uruchomienie symulacyjne opisuje
+[android/webhmi/README.md](../android/webhmi/README.md).
+Aplikacja łączy się do istniejącej bramy po HTTPS lub po świadomie dozwolonym HTTP
+w prywatnej sieci. Nie jest kontrolerem czasu rzeczywistego, nie zawiera LinuxCNC
+i nie zastępuje sprzętowego E-STOP lub niezależnego watchdog.
