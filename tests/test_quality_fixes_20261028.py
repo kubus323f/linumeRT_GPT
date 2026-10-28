@@ -2,6 +2,7 @@
 
 SPDX-License-Identifier: GPL-2.0-or-later
 """
+import math
 from dataclasses import replace
 from types import SimpleNamespace
 
@@ -57,6 +58,19 @@ def test_native_inches_are_converted_to_mm():
     assert axes["X"]["work_position"] == pytest.approx(2501.9)
     assert axes["X"]["following_error"] == pytest.approx(2.54)
     assert axes["X"]["soft_max"] == pytest.approx(7620)
+
+
+def test_rotary_native_radians_are_converted_to_degrees():
+    state = replace(snap(angular_units=math.pi / 180), axes=(
+        AxisSnapshot("A", position=math.pi, commanded=math.pi + 0.1),))
+    axis = snapshot_to_dict(state)["axes"][0]
+    assert axis["position"] == pytest.approx(180)
+    assert axis["following_error"] == pytest.approx(0.1 * 180 / math.pi, abs=0.0001)
+
+
+def test_xy_rotation_without_both_axes_fails_closed_for_work_readout():
+    state = replace(snap(rotation_xy=45), axes=(AxisSnapshot("X", position=1),))
+    assert snapshot_to_dict(state)["axes"][0]["work_position"] is None
 
 
 def test_unknown_units_are_not_labeled_mm():

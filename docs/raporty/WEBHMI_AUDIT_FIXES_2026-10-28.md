@@ -5,7 +5,9 @@ Base: `aa0b5e3255de3a144a6699e4cb21265113811b90` (fork `kubus323f/linumeRT_GPT`)
 ## What changed
 - Strict Host parsing including bracketed IPv6 with invalid-port rejection.
 - Correct inverse work coordinates: subtract tool offset, subtract G5x, undo XY rotation, subtract G92 (G52 shares G92 state).
-- Reader captures G92, XY rotation and native machine scale; browser receives linear coordinates and following errors in mm.
+- Reader captures G92, XY rotation and native machine scale; browser receives linear coordinates and following errors in mm, and angular values in degrees.
+- Non-identity kinematics are rejected for joint-mode JOG/HOME; STOP attempts all joints on unsupported mappings.
+- Incomplete XY data with active rotation is shown as unavailable rather than guessed.
 - LinuxCNC backend rejects RUN/MDI/JOG in invalid task/interpreter state, and RUN without all axes homed or loaded program.
 - Reject HOME/JOG operations with mismatched number of axes and joints; STOP attempts every joint for this mismatch.
 - Unit tests cover these regressions.
@@ -14,7 +16,7 @@ The work-coordinate transform follows `rotate_and_offset` and `unoffset_and_unro
 
 ## Limits and safety gates
 - Not tested on real hardware; not a safety-rated implementation.
-- Mapping of complex kinematics is intentionally refused where joint counts reveal an unsafe assumption. Same-count nontrivial kinematics need a separate capability handshake.
+- Non-identity kinematics and mismatching joint counts are refused. A missing kinematics type remains a compatibility allowance for older/test stubs and requires machine-specific verification.
 - G68 tilted work planes and other advanced kinematic transforms are outside the implemented transform.
 - A process-external watchdog for LinuxCNC continuous jogging is **not implemented**. Before physical motion, independent external E-STOP/watchdog integration and hardware acceptance tests remain mandatory.
 - CI tests are necessary but not sufficient for physical deployment.

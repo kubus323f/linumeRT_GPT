@@ -4,6 +4,7 @@ SPDX-License-Identifier: GPL-2.0-or-later
 Model-Author: Claude · NIEZWERYFIKOWANE NA LinuxCNC 2.9 RIP
 """
 
+import math
 from types import SimpleNamespace
 
 import pytest
@@ -27,14 +28,16 @@ class Recorder:
         return call
 
 
-def backend(task_state=70, task_mode=1, wait_result=0, linear_units=1.0):
+def backend(task_state=70, task_mode=1, wait_result=0, linear_units=1.0,
+            angular_units=1.0):
     # Stałe celowo inne niż w prawdziwym LinuxCNC: mapowanie idzie po nazwie stałej.
     stat = SimpleNamespace(
         poll=lambda: None, task_state=task_state, task_mode=task_mode, interp_state=1,
         axis_mask=0b111, actual_position=(0,) * 9, position=(0,) * 9, homed=(1, 1, 1),
         limit=(0, 0, 0), axis=({}, {}, {}), current_line=0, file="", feedrate=1.0,
         rapidrate=1.0, spindle=({},), tool_in_spindle=0, tool_offset=(), g5x_index=1,
-        g5x_offset=(), gcodes=(), mcodes=(), linear_units=linear_units)
+        g5x_offset=(), gcodes=(), mcodes=(), linear_units=linear_units,
+        angular_units=angular_units)
     command = Recorder(wait_result)
     module = SimpleNamespace(
         STATE_ESTOP=1, STATE_ESTOP_RESET=2, STATE_OFF=3, STATE_ON=70,
@@ -175,6 +178,37 @@ def test_increment_converts_both_velocity_and_distance_without_reissuing_mode(un
     b.snapshot()
     b.jog_increment("X", speed, 0.1)
     assert c.calls == [("teleop_enable", 0), ("jog", 22, True, 0, speed * units, 0.1 * units)]
+
+
+def test_rotary_jog_scales_degrees_to_native_radians():
+    b, c = backend(angular_units=math.pi / 180)
+    b._reader._stat.axis_mask = 0b1111
+    b._reader._stat.homed = (1,) * 4
+    b.snapshot()
+    b.jog("A", 90)
+    b.jog_increment("A", -45, 1)
+    assert c.calls == [
+        ("teleop_enable", 0), ("jog", 21, True, 3, pytest.approx(math.pi / 2)),
+        ("teleop_enable", 0),
+        ("jog", 22, True, 3, pytest.approx(-math.pi / 4),
+         pytest.approx(math.pi / 180)),
+    ]
+
+
+def test_nonidentity_kinematics_rejects_jog_home_but_stop_all():
+    b, c = backend()
+    b._reader._stat.joints = 3
+    b._reader._stat.kinematics_type = 2
+    b._lc().KINEMATICS_IDENTITY = 1
+    b.snapshot()
+    with pytest.raises(CommandError, match="mapowanie"):
+        b.jog("X", 1)
+    with pytest.raises(CommandError, match="bazowanie"):
+        b.home(None)
+    assert c.calls == []
+    b.jog_stop("X")
+    assert c.calls == [("jog", 20, True, 0), ("jog", 20, True, 1),
+                       ("jog", 20, True, 2)]
 
 
 def test_increment_rotary_is_in_degrees_even_with_inch_linear_machine():

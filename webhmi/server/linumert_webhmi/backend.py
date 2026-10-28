@@ -163,6 +163,7 @@ class LinuxCNCBackend:
         self._command = command
         self._last: MachineSnapshot | None = None
         self._linear_units: float | None = None
+        self._angular_units: float | None = None
 
     def _lc(self) -> Any:
         if self._module is None:
@@ -182,11 +183,22 @@ class LinuxCNCBackend:
     def _joint_axes(self) -> tuple[str, ...]:
         return self._recent().axis_names
 
-    def _joint_index(self, axis: str) -> int:
+    def _joint_mapping_supported(self) -> bool:
+        """Joint-mode JOG/HOME tylko dla kinematyki tożsamościowej 1:1."""
         names = self._joint_axes()
         stat = getattr(self._reader, "_stat", None)
         joints = getattr(stat, "joints", None)
         if joints is not None and joints != len(names):
+            return False
+        kinematics = getattr(stat, "kinematics_type", None)
+        if kinematics is None:  # starsze lub testowe atrapy nie mają tego pola
+            return True
+        identity = getattr(self._lc(), "KINEMATICS_IDENTITY", None)
+        return identity is not None and kinematics == identity
+
+    def _joint_index(self, axis: str) -> int:
+        names = self._joint_axes()
+        if not self._joint_mapping_supported():
             raise CommandError("mapowanie osi na przeguby nie jest obsługiwane dla tej kinematyki")
         if axis.upper() not in names:
             raise CommandError(f"nieznana oś {axis!r}")
@@ -207,6 +219,8 @@ class LinuxCNCBackend:
         # LinuxCNC reports machine units per mm; G20/G21 does not change these.
         units = getattr(self._reader._stat, "linear_units", None)
         self._linear_units = float(units) if units is not None else None
+        angular = getattr(self._reader._stat, "angular_units", 1.0)
+        self._angular_units = float(angular) if angular is not None else None
         return self._last
 
     def estop(self) -> None:
@@ -234,7 +248,7 @@ class LinuxCNCBackend:
         names = self._joint_axes()
         stat = getattr(self._reader, "_stat", None)
         joints = getattr(stat, "joints", None)
-        if joints is not None and joints != len(names):
+        if not self._joint_mapping_supported():
             raise CommandError("bazowanie: nieobsługiwane mapowanie osi na przeguby")
         if axis and axis.upper() not in names:
             raise CommandError(f"nieznana oś {axis!r}")
@@ -294,12 +308,10 @@ class LinuxCNCBackend:
         # tożsamościową (i-ta oś = i-ty przegub), jak czytnik.
         # command.jog takes machine units/SECOND (AXIS get_jog_speed), not per minute.
         joint = self._joint_index(axis)
-        velocity = speed
-        if axis.upper() not in "ABC":
-            units = self._linear_units
-            if units is None or not math.isfinite(units) or units <= 0:
-                raise CommandError("jog: brak poprawnej skali jednostek maszyny")
-            velocity *= units  # API mm/s -> native units/s; angular axes use degrees/s.
+        units = self._angular_units if axis.upper() in "ABC" else self._linear_units
+        if units is None or not math.isfinite(units) or units <= 0:
+            raise CommandError("jog: brak poprawnej skali jednostek maszyny")
+        velocity = speed * units  # liniowe mm/s, obrotowe deg/s -> native/s
         cmd.teleop_enable(0)
         cmd.jog(lc.JOG_CONTINUOUS, True, joint, velocity)
 
@@ -308,9 +320,10 @@ class LinuxCNCBackend:
         names = self._joint_axes()
         stat = getattr(self._reader, "_stat", None)
         joints = getattr(stat, "joints", None)
-        if joints is not None and joints != len(names):
+        if not self._joint_mapping_supported():
             # Nie zakładaj arbitralnego mapowania; wyślij STOP do wszystkich jointów.
-            for joint in range(joints):
+            count = joints if isinstance(joints, int) and joints >= 0 else len(names)
+            for joint in range(count):
                 cmd.jog(lc.JOG_STOP, True, joint)
             return
         for name in (axis.upper(),) if axis else names:
@@ -322,12 +335,10 @@ class LinuxCNCBackend:
         if self._recent().mode is not Mode.MANUAL:
             raise CommandError("jog: wymagany tryb MANUAL")
         joint = self._joint_index(axis)
-        scale = 1.0
-        if axis.upper() not in "ABC":
-            units = self._linear_units
-            if units is None or not math.isfinite(units) or units <= 0:
-                raise CommandError("jog: brak poprawnej skali jednostek maszyny")
-            scale = units
+        units = self._angular_units if axis.upper() in "ABC" else self._linear_units
+        if units is None or not math.isfinite(units) or units <= 0:
+            raise CommandError("jog: brak poprawnej skali jednostek maszyny")
+        scale = units
         _increment_target(self._recent(), axis, speed, distance, scale)
         cmd.teleop_enable(0)
         cmd.jog(lc.JOG_INCREMENT, True, joint, speed * scale, distance * scale)

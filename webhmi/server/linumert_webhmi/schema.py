@@ -29,14 +29,21 @@ def _num(value: float) -> float | None:
 def _display_value(snap: MachineSnapshot, axis: str, value: float,
                    digits: int | None = None) -> float | None:
     """Jednostki interfejsu: liniowe mm, obrotowe stopnie."""
-    if axis not in ("A", "B", "C"):
-        units = snap.linear_units
-        if not math.isfinite(units) or units <= 0:
-            return None
-        value /= units
+    units = snap.angular_units if axis in ("A", "B", "C") else snap.linear_units
+    if not math.isfinite(units) or units <= 0:
+        return None
+    value /= units
     if not math.isfinite(value):
         return None
     return round(value, digits) if digits is not None else value
+
+
+def _work_position(snap: MachineSnapshot, axis: str) -> float | None:
+    try:
+        return _display_value(snap, axis, snap.work_position(axis), 4)
+    except KeyError:
+        # Obrót XY bez obu osi: nie prezentuj zgadywanych współrzędnych.
+        return None
 
 
 def snapshot_to_dict(snap: MachineSnapshot) -> dict:
@@ -49,7 +56,7 @@ def snapshot_to_dict(snap: MachineSnapshot) -> dict:
             {
                 "name": a.name,
                 "position": _display_value(snap, a.name, a.position, 4),
-                "work_position": _display_value(snap, a.name, snap.work_position(a.name), 4),
+                "work_position": _work_position(snap, a.name),
                 "following_error": _display_value(snap, a.name, a.following_error, 4),
                 "homed": a.homed,
                 "soft_min": _display_value(snap, a.name, a.soft_min),

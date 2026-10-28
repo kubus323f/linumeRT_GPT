@@ -120,6 +120,8 @@ class LinuxCNCReader:
             rotation_xy=float(getattr(stat, "rotation_xy", 0.0)),
             linear_units=(float(units) if (units := getattr(stat, "linear_units", 1.0))
                           is not None else float("nan")),
+            angular_units=(float(units) if (units := getattr(stat, "angular_units", 1.0))
+                           is not None else float("nan")),
             active_gcodes=self._codes(getattr(stat, "gcodes", ()), "G", 10),
             active_mcodes=self._codes(getattr(stat, "mcodes", ()), "M", 1),
             errors=self._drain_errors(module),

@@ -83,6 +83,7 @@ class MachineSnapshot:
     g92_offset: dict[str, float] = field(default_factory=dict)
     rotation_xy: float = 0.0  # stopnie G5x R wokół osi Z
     linear_units: float = 1.0  # liczba jednostek natywnych na mm (inch: 1/25.4)
+    angular_units: float = 1.0  # liczba jednostek natywnych na stopień (rad: pi/180)
 
     def axis(self, name: str) -> AxisSnapshot:
         for item in self.axes:
