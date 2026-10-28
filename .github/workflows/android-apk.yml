@@ -1,0 +1,65 @@
+name: Android WebHMI APK
+
+on:
+  push:
+    branches:
+      - 'feat/android-webhmi-apk'
+    paths:
+      - 'android/webhmi/**'
+      - '.github/workflows/android-apk.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-webhmi-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: URL/origin policy tests without Android SDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/linumert-java-tests"
+          javac -d "$RUNNER_TEMP/linumert-java-tests" \
+            android/webhmi/app/src/main/java/pl/jakubzietarski/linumert/mobile/ServerUrlPolicy.java \
+            android/webhmi/tests/ServerUrlPolicyTest.java
+          java -cp "$RUNNER_TEMP/linumert-java-tests" \
+            pl.jakubzietarski.linumert.mobile.ServerUrlPolicyTest
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Build installable debug APK (no CNC jobs)
+        run: gradle --no-daemon --stacktrace -p android/webhmi :app:assembleDebug
+      - name: Verify APK package and version
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="android/webhmi/app/build/outputs/apk/debug/app-debug.apk"
+          test -s "$APK"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | tee android-apk-metadata.txt
+          grep -q "package: name='pl.jakubzietarski.linumert.mobile' versionCode='1'" android-apk-metadata.txt
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$APK"
+          sha256sum "$APK" | tee android-apk-sha256.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linumeRT-WebHMI-Android16-APK
+          path: |
+            android/webhmi/app/build/outputs/apk/debug/app-debug.apk
+            android-apk-metadata.txt
+            android-apk-sha256.txt
+          if-no-files-found: error
+          retention-days: 30
