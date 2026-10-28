@@ -73,6 +73,7 @@ def test_gateway_backend_has_no_estop_reset_method():
 
 def test_mdi_run_pause_resume_stop():
     b, c = backend()
+    b._reader._stat.file = "program.ngc"
     b.mdi("G0 X1")
     b.run(5)
     b.pause()

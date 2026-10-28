@@ -184,6 +184,10 @@ class LinuxCNCBackend:
 
     def _joint_index(self, axis: str) -> int:
         names = self._joint_axes()
+        stat = getattr(self._reader, "_stat", None)
+        joints = getattr(stat, "joints", None)
+        if joints is not None and joints != len(names):
+            raise CommandError("mapowanie osi na przeguby nie jest obsługiwane dla tej kinematyki")
         if axis.upper() not in names:
             raise CommandError(f"nieznana oś {axis!r}")
         return names.index(axis.upper())
@@ -224,10 +228,17 @@ class LinuxCNCBackend:
         self._wait(cmd)
 
     def home(self, axis: str | None) -> None:
+        snap = self._recent()
+        if snap.task_state.value != "on" or snap.interp_state.value != "idle":
+            raise CommandError("bazowanie: wymagane ON i IDLE")
         names = self._joint_axes()
+        stat = getattr(self._reader, "_stat", None)
+        joints = getattr(stat, "joints", None)
+        if joints is not None and joints != len(names):
+            raise CommandError("bazowanie: nieobsługiwane mapowanie osi na przeguby")
         if axis and axis.upper() not in names:
             raise CommandError(f"nieznana oś {axis!r}")
-        targets = (names.index(axis.upper()),) if axis else tuple(range(len(names)))
+        targets = (self._joint_index(axis),) if axis else tuple(range(len(names)))
         cmd = self._cmd()
         cmd.mode(self._lc().MODE_MANUAL)
         self._wait(cmd)
@@ -235,12 +246,19 @@ class LinuxCNCBackend:
             cmd.home(joint)
 
     def mdi(self, text: str) -> None:
+        snap = self._recent()
+        if snap.task_state.value != "on" or snap.interp_state.value != "idle":
+            raise CommandError("MDI: wymagane ON i IDLE")
         lc, cmd = self._lc(), self._cmd()
         cmd.mode(lc.MODE_MDI)
         self._wait(cmd)
         cmd.mdi(text)
 
     def run(self, from_line: int) -> None:
+        snap = self._recent()
+        if (snap.task_state.value != "on" or snap.interp_state.value != "idle"
+                or not snap.all_homed or not snap.program_file):
+            raise CommandError("start: wymagane ON, IDLE, bazowanie i załadowany program")
         lc, cmd = self._lc(), self._cmd()
         cmd.mode(lc.MODE_AUTO)
         self._wait(cmd)
@@ -267,7 +285,10 @@ class LinuxCNCBackend:
 
     def jog(self, axis: str, speed: float) -> None:
         lc, cmd = self._lc(), self._cmd()
-        if self._recent().mode is not Mode.MANUAL:
+        snap = self._recent()
+        if snap.task_state.value != "on" or snap.interp_state.value != "idle":
+            raise CommandError("jog: wymagane ON i IDLE")
+        if snap.mode is not Mode.MANUAL:
             raise CommandError("jog: wymagany tryb MANUAL")
         # Jog przegubu (jjogmode=True), nie osi: nie wymaga trybu teleop. Zakładamy kinematykę
         # tożsamościową (i-ta oś = i-ty przegub), jak czytnik.
@@ -285,6 +306,13 @@ class LinuxCNCBackend:
     def jog_stop(self, axis: str | None) -> None:
         lc, cmd = self._lc(), self._cmd()
         names = self._joint_axes()
+        stat = getattr(self._reader, "_stat", None)
+        joints = getattr(stat, "joints", None)
+        if joints is not None and joints != len(names):
+            # Nie zakładaj arbitralnego mapowania; wyślij STOP do wszystkich jointów.
+            for joint in range(joints):
+                cmd.jog(lc.JOG_STOP, True, joint)
+            return
         for name in (axis.upper(),) if axis else names:
             if name in names:
                 cmd.jog(lc.JOG_STOP, True, names.index(name))

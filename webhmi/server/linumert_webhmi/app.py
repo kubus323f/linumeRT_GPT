@@ -44,7 +44,17 @@ LOOPBACK_HOSTS = ("127.0.0.1", "localhost", "[::1]")
 
 
 def _host_only(value: str) -> str:
-    return value.rsplit(":", 1)[0] if value.count(":") == 1 else value
+    """Zwraca host bez portu; odrzuca niepoprawne nagłówki, obsługuje IPv6."""
+    try:
+        parts = urlsplit("//" + value)
+        parts.port  # walidacja portu (liczbowy, <= 65535)
+        if (not parts.hostname or parts.username is not None
+                or parts.password is not None or parts.path
+                or parts.query or parts.fragment):
+            return ""
+        return f"[{parts.hostname}]" if ":" in parts.hostname else parts.hostname
+    except ValueError:
+        return ""
 
 
 def create_app(gateway: Gateway, token: str, extra_hosts: tuple[str, ...] = ()) -> FastAPI:

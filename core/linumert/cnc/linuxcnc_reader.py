@@ -116,6 +116,10 @@ class LinuxCNCReader:
             tool_offset=self._by_axis(getattr(stat, "tool_offset", ()), indices, names),
             work_offset_name=offset_name,
             work_offset=self._by_axis(getattr(stat, "g5x_offset", ()), indices, names),
+            g92_offset=self._by_axis(getattr(stat, "g92_offset", ()), indices, names),
+            rotation_xy=float(getattr(stat, "rotation_xy", 0.0)),
+            linear_units=(float(units) if (units := getattr(stat, "linear_units", 1.0))
+                          is not None else float("nan")),
             active_gcodes=self._codes(getattr(stat, "gcodes", ()), "G", 10),
             active_mcodes=self._codes(getattr(stat, "mcodes", ()), "M", 1),
             errors=self._drain_errors(module),

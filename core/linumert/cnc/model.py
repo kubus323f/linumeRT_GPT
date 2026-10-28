@@ -10,6 +10,7 @@ w jednostkach maszyny. Rdzen i ekran korzystaja z tego samego modelu przez zwykl
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 from enum import Enum
 
@@ -79,6 +80,9 @@ class MachineSnapshot:
     active_gcodes: tuple[str, ...] = ()
     active_mcodes: tuple[str, ...] = ()
     errors: tuple[str, ...] = ()
+    g92_offset: dict[str, float] = field(default_factory=dict)
+    rotation_xy: float = 0.0  # stopnie G5x R wokół osi Z
+    linear_units: float = 1.0  # liczba jednostek natywnych na mm (inch: 1/25.4)
 
     def axis(self, name: str) -> AxisSnapshot:
         for item in self.axes:
@@ -103,13 +107,27 @@ class MachineSnapshot:
         return self.spindle_direction != 0
 
     def work_position(self, name: str) -> float:
-        """Pozycja w biezacym ukladzie roboczym (G54..G59.3).
+        """Odwrotność transformacji LinuxCNC: TLO, G5x, obrót XY, G92.
 
-        Uwzglednia tylko przesuniecie ukladu roboczego; G92 i dlugosc narzedzia
-        nie sa tu odejmowane.
+        Obsługuje typowy układ kartezjański, nie G68.2 ani nieoczywistą
+        kinematykę. Wartość jest nadal w natywnych jednostkach maszyny.
         """
         axis = self.axis(name)
-        return axis.position - self.work_offset.get(axis.name, 0.0)
+
+        def without_base(letter: str) -> float:
+            return (self.axis(letter).position - self.tool_offset.get(letter, 0.0)
+                    - self.work_offset.get(letter, 0.0))
+
+        if axis.name in ("X", "Y") and self.rotation_xy:
+            angle = math.radians(self.rotation_xy)
+            cosine, sine = math.cos(angle), math.sin(angle)
+            x = without_base("X")
+            y = without_base("Y")
+            unrotated = x * cosine + y * sine if axis.name == "X" else -x * sine + y * cosine
+            return unrotated - self.g92_offset.get(axis.name, 0.0)
+        return (axis.position - self.tool_offset.get(axis.name, 0.0)
+                - self.work_offset.get(axis.name, 0.0)
+                - self.g92_offset.get(axis.name, 0.0))
 
     def age(self, now: float) -> float:
         return now - self.timestamp

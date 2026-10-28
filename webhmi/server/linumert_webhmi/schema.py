@@ -26,6 +26,19 @@ def _num(value: float) -> float | None:
     return value if math.isfinite(value) else None
 
 
+def _display_value(snap: MachineSnapshot, axis: str, value: float,
+                   digits: int | None = None) -> float | None:
+    """Jednostki interfejsu: liniowe mm, obrotowe stopnie."""
+    if axis not in ("A", "B", "C"):
+        units = snap.linear_units
+        if not math.isfinite(units) or units <= 0:
+            return None
+        value /= units
+    if not math.isfinite(value):
+        return None
+    return round(value, digits) if digits is not None else value
+
+
 def snapshot_to_dict(snap: MachineSnapshot) -> dict:
     return {
         "schema": SCHEMA_VERSION,
@@ -35,12 +48,12 @@ def snapshot_to_dict(snap: MachineSnapshot) -> dict:
         "axes": [
             {
                 "name": a.name,
-                "position": round(a.position, 4),
-                "work_position": round(snap.work_position(a.name), 4),
-                "following_error": round(a.following_error, 4),
+                "position": _display_value(snap, a.name, a.position, 4),
+                "work_position": _display_value(snap, a.name, snap.work_position(a.name), 4),
+                "following_error": _display_value(snap, a.name, a.following_error, 4),
                 "homed": a.homed,
-                "soft_min": _num(a.soft_min),
-                "soft_max": _num(a.soft_max),
+                "soft_min": _display_value(snap, a.name, a.soft_min),
+                "soft_max": _display_value(snap, a.name, a.soft_max),
                 "limit_hit": a.limit_hit,
             }
             for a in snap.axes
