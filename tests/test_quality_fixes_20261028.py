@@ -71,7 +71,7 @@ def test_nontrivial_joint_count_blocks_motion_but_stops_all():
     controller = SimpleNamespace(jog=lambda *a: calls.append(a))
     bridge = LinuxCNCBackend(module=SimpleNamespace(JOG_STOP=123),
                              reader=reader, command=controller)
-    bridge._last = snap()
+    bridge._last = snap(task_state=TaskState.ON)
     with pytest.raises(CommandError, match="mapowanie"):
         bridge._joint_index("X")
     with pytest.raises(CommandError, match="mapowanie"):
