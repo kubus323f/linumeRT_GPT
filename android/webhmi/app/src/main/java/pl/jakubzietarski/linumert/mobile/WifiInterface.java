@@ -15,6 +15,26 @@ import java.net.InetAddress;
 final class WifiInterface {
     private WifiInterface() {}
 
+    static Network networkForPrivateIpv4(Context context, String address) {
+        if (address == null || address.isEmpty()) return null;
+        ConnectivityManager cm = (ConnectivityManager) context.getSystemService(
+                Context.CONNECTIVITY_SERVICE);
+        if (cm == null) return null;
+        try {
+            for (Network n : cm.getAllNetworks()) {
+                NetworkCapabilities cap = cm.getNetworkCapabilities(n);
+                if (cap == null || !cap.hasTransport(NetworkCapabilities.TRANSPORT_WIFI))
+                    continue;
+                LinkProperties link = cm.getLinkProperties(n);
+                if (link == null) continue;
+                for (LinkAddress a : link.getLinkAddresses()) {
+                    if (address.equals(a.getAddress().getHostAddress())) return n;
+                }
+            }
+        } catch (RuntimeException ignored) { }
+        return null;
+    }
+
     static String currentPrivateIpv4(Context context) {
         ConnectivityManager cm = (ConnectivityManager) context.getSystemService(
                 Context.CONNECTIVITY_SERVICE);
