@@ -111,26 +111,82 @@ java -cp "$WORK/.linumert-java-tests" pl.jakubzietarski.linumert.mobile.MobileRu
 java -cp "$WORK/.linumert-java-tests" pl.jakubzietarski.linumert.mobile.ServerUrlPolicyTest
 
 echo "=== BUILD EXPERIMENTAL LOCAL WEBHMI ==="
+# Android's stock build-tools aapt2 is commonly Linux x86-64 and cannot run
+# on this ARM64 phone. Never select a candidate solely because it is executable.
 AAPT2=""
-for candidate in "$SDK/build-tools/35.0.0/aapt2" "$SDK/build-tools/36.0.0/aapt2" "$SDK/build-tools/34.0.4/aapt2"; do
-    if [ -x "$candidate" ]; then
+AAPT2_PROBE="$OUT/aapt2-probe.txt"
+: > "$AAPT2_PROBE"
+candidates=(
+    "${LINUMERT_AAPT2:-}"
+    "${PREFIX:-/data/data/com.termux/files/usr}/bin/aapt2"
+    "$(command -v aapt2 || true)"
+    "$HOME/bin/aapt2"
+    "$HOME/android-sdk/build-tools/34.0.4/aapt2"
+    "$SDK/build-tools/34.0.4/aapt2"
+    "$SDK/build-tools/35.0.0/aapt2"
+    "$SDK/build-tools/36.0.0/aapt2"
+)
+# Scan installed SDK tools too, but independently verify ELF architecture.
+if [ -d "$SDK/build-tools" ]; then
+    while IFS= read -r candidate; do candidates+=("$candidate"); done < <(
+        find "$SDK/build-tools" -mindepth 2 -maxdepth 2 -name aapt2 -type f 2>/dev/null
+    )
+fi
+for candidate in "${candidates[@]}"; do
+    if [ -z "$candidate" ] || [ ! -f "$candidate" ] || [ ! -x "$candidate" ]; then
+        continue
+    fi
+    if probe="$(python3 - "$candidate" 2>&1 <<'PY'
+import pathlib
+import subprocess
+import sys
+
+p = pathlib.Path(sys.argv[1])
+resolved = p.resolve()
+try:
+    with resolved.open("rb") as stream:
+        header = stream.read(20)
+    if header.startswith(b"\\x7fELF"):
+        endian = "little" if header[5] == 1 else "big"
+        machine = int.from_bytes(header[18:20], endian)
+        if machine != 183:
+            raise RuntimeError(f"ELF e_machine={machine} (requires ARM64/183)")
+    elif not header.startswith(b"#!"):
+        raise RuntimeError("not ELF or an executable wrapper script")
+    run = subprocess.run([str(p), "version"], stdout=subprocess.PIPE,
+                         stderr=subprocess.STDOUT, text=True, timeout=8, check=False)
+    output = run.stdout.strip().replace("\\n", " ")[:280]
+    if run.returncode != 0 or "aapt" not in output.lower() or "2" not in output:
+        raise RuntimeError(f"version probe failed (exit={run.returncode}): {output}")
+    print(f"ACCEPT {p} -> {resolved}: {output}")
+except Exception as exc:
+    print(f"REJECT {p} -> {resolved}: {type(exc).__name__}: {exc}")
+    sys.exit(1)
+PY
+)"; then
+        echo "$probe" | tee -a "$AAPT2_PROBE"
         AAPT2="$candidate"
         break
+    else
+        echo "$probe" | tee -a "$AAPT2_PROBE"
     fi
 done
+if [ -z "$AAPT2" ]; then
+    echo "ERROR: Brak zgodnego, uruchamialnego AAPT2 ARM64." | tee -a "$AAPT2_PROBE"
+    echo "Podaj aapt2-probe.txt i build.log z: $OUT" | tee -a "$AAPT2_PROBE"
+    echo "Nie uruchamiam x86-64 ani nie instaluje niezweryfikowanych binarek."
+    exit 8
+fi
 args=(
     --no-daemon
     --stacktrace
     -p "$WORK/android/webhmi"
     :app:assembleDebug
     -PlinumertFullWebHmi=true
+    "-Pandroid.aapt2FromMavenOverride=$AAPT2"
 )
-if [ -n "$AAPT2" ]; then
-    echo "Uzywam lokalnego AAPT2: $AAPT2"
-    args+=("-Pandroid.aapt2FromMavenOverride=$AAPT2")
-else
-    echo "OSTRZEZENIE: lokalny AAPT2 nie znaleziony, Gradle moze probowac pobrac niezgodna binarke."
-fi
+echo "Wybrany natywny AAPT2 ARM64: $AAPT2"
+
 gradle "${args[@]}"
 APK="$WORK/android/webhmi/app/build/outputs/apk/debug/app-debug.apk"
 if [ ! -s "$APK" ]; then
