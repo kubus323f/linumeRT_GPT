@@ -32,6 +32,27 @@ Lokalny serwer nigdy nie podmienia zdalnego połączenia z maszyną. Przy awarii
 wbudowanego serwera aplikacja może automatycznie wrócić tylko do poprzednio
 wybranego przez użytkownika adresu **HTTPS**, bez automatycznego uwierzytelniania.
 
+## Podpis instalacyjny i rownolegle wydanie testowe
+
+Istniejaca instalacja `pl.jakubzietarski.linumert.mobile` jest podpisana innym
+kluczem niz nowe lokalne kompilacje debug; Android slusznie odrzuca aktualizacje
+`INSTALL_FAILED_UPDATE_INCOMPATIBLE`. Nie usuwamy starej aplikacji ani jej danych.
+
+Od tej galęzi **wariant debug** używa odrębnego identyfikatora
+`pl.jakubzietarski.linumert.mobile.preview` i etykiety **linumeRT Mobile (TEST)**.
+Do aktualizacji starego identyfikatora wymagany jest jego oryginalny prywatny
+klucz podpisujący lub przejście po świadomie zatwierdzonej migracji.
+Lokalna kompilacja na telefonie:
+
+```sh
+bash /sdcard/Download/linumert-mobile-build.sh --install
+```
+
+Skrypt weryfikuje `output-metadata.json` przed instalacją i może testowo uruchomić
+nowe WebHMI. Zapisuje `build.log`, SHA-256, `launch.txt`, `health.json` (gdy
+serwer odpowiada). Lokalny debug keystore musi pozostać bezpiecznie zachowany,
+aby kolejne aktualizacje tej samej wersji preview miały ten sam podpis.
+
 ## Pobranie i instalacja APK
 1. Otwórz [Android WebHMI APK — GitHub Actions](https://github.com/kubus323f/linumeRT_GPT/actions/workflows/android-apk.yml).
 2. Wybierz pomyślny przebieg \`Android WebHMI APK\` i pobierz artefakt \`linumeRT-WebHMI-Android16-APK\`.
@@ -66,8 +87,8 @@ Uwaga: \`--host 0.0.0.0\` może kolidować z kontrolą Host; używaj konkretnego
   maszyny** przy błędzie łączności lub awarii bramy.
 - Fizyczny E-STOP oraz watchdog po stronie sterownika są niezbędne przed użyciem na maszynie.
   Aplikacja ani programowy STOP nie są elementami bezpieczeństwa funkcjonalnego.
-- Artefakt to debug APK z kluczem debug runnera: kolejne buildy mogą mieć inną sygnaturę,
-  a instalacja nowszego pliku może wymagać odinstalowania poprzedniej wersji.
+- Artefakt to debug APK z kluczem debug środowiska kompilującego: kolejne buildy
+  na innych urządzeniach mogą mieć inną sygnaturę. Nie odinstalowuj automatycznie aplikacji.
   Do trwałych aktualizacji potrzebny jest stały klucz podpisywania, poza repozytorium.
 - Android 10+ (minSdk 29); Android 16/HyperOS 3 obsługiwany (targetSdk 35).
 - Standardowy wariant nie działa offline bez zewnętrznego WebHMI. Wariant
