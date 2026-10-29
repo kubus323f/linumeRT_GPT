@@ -50,6 +50,17 @@ class WifiAccessContractTest(unittest.TestCase):
         self.assertIn("copyLocalToken()", ui)
         self.assertIn("ClipDescription.EXTRA_IS_SENSITIVE", ui)
 
+    def test_wifi_loss_revokes_network_access_and_notification(self):
+        root = ROOT / "app/src/main/java/pl/jakubzietarski/linumert/mobile"
+        service = (root / "LocalServerService.java").read_text(encoding="utf-8")
+        self.assertIn("approvedWifiNetwork", service)
+        self.assertIn("onLost(Network network)", service)
+        self.assertIn("onLinkPropertiesChanged(", service)
+        self.assertIn("revokeOnNetworkLoss()", service)
+        self.assertIn("LocalWebHmiClient.stop()", service)
+        self.assertIn("FOREGROUND_SERVICE_TYPE_SPECIAL_USE", service)
+        self.assertIn("stopForeground(STOP_FOREGROUND_REMOVE)", service)
+
     def test_authentication_works_with_pydantic_one_or_two(self):
         source = (ROOT.parents[1] / "webhmi/server/linumert_webhmi/app.py"
                   ).read_text(encoding="utf-8")
