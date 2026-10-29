@@ -212,18 +212,36 @@ echo "Wybrany natywny AAPT2 ARM64: $AAPT2"
 
 gradle "${args[@]}"
 APK="$WORK/android/webhmi/app/build/outputs/apk/debug/app-debug.apk"
-if [ ! -s "$APK" ]; then
-    echo "ERROR: Gradle nie wygenerowal APK"
+METADATA="$WORK/android/webhmi/app/build/outputs/apk/debug/output-metadata.json"
+PREVIEW_PACKAGE="pl.jakubzietarski.linumert.mobile.preview"
+if [ ! -s "$APK" ] || [ ! -s "$METADATA" ]; then
+    echo "ERROR: Gradle nie wygenerowal APK lub metadanych tozsamosci."
     exit 6
 fi
-cp "$APK" "$OUT/linumeRT-Mobile-dev2-experimental.apk"
-sha256sum "$OUT/linumeRT-Mobile-dev2-experimental.apk" | tee "$OUT/SHA256.txt"
-echo "APK: $OUT/linumeRT-Mobile-dev2-experimental.apk"
+# Fail closed before attempting adb install: never accidentally overwrite v1.
+python3 - "$METADATA" "$PREVIEW_PACKAGE" <<'PY'
+import json
+import sys
+from pathlib import Path
+p = Path(sys.argv[1])
+expected = sys.argv[2]
+data = json.loads(p.read_text(encoding="utf-8"))
+actual = data.get("applicationId")
+versions = [x.get("versionCode") for x in data.get("elements", [])]
+if actual != expected or versions != [2]:
+    raise SystemExit(f"ERROR: odmowa instalacji APK: expected {expected} v2, got {actual} {versions}")
+print(f"PASS: bezpieczna odrebna tozsamosc APK: {actual} v2")
+PY
+cp "$METADATA" "$OUT/output-metadata.json"
+PREVIEW_APK="$OUT/linumeRT-Mobile-preview-dev2.apk"
+cp "$APK" "$PREVIEW_APK"
+sha256sum "$PREVIEW_APK" | tee "$OUT/SHA256.txt"
+echo "APK: $PREVIEW_APK"
 
 SIGNER="$SDK/build-tools/35.0.0/apksigner"
 if [ ! -x "$SIGNER" ]; then SIGNER="$SDK/build-tools/36.0.0/apksigner"; fi
 if [ -x "$SIGNER" ]; then
-    "$SIGNER" verify --verbose --print-certs "$OUT/linumeRT-Mobile-dev2-experimental.apk" \
+    "$SIGNER" verify --verbose --print-certs "$PREVIEW_APK" \
         | tee "$OUT/apk-signing.txt"
 else
     echo "OSTRZEZENIE: apksigner nie znaleziony; brak potwierdzenia podpisu."
@@ -239,9 +257,49 @@ if [ "$INSTALL" -eq 1 ]; then
         echo "ERROR: Lokalna autoryzowana sesja ADB nie jest aktywna. APK zostalo zachowane."
         exit 7
     fi
-    echo "Instalacja zachowuje dane aplikacji. Przy innym certyfikacie podpisu zatrzyma sie bez odinstalowania."
-    adb -s 127.0.0.1:5555 install -r "$OUT/linumeRT-Mobile-dev2-experimental.apk"
-    echo "adb install -r: sukces (nie oznacza jeszcze testu dzialania serwera)."
+    echo "Instalacja osobna: $PREVIEW_PACKAGE (istniejaca aplikacja i jej dane bez zmian)."
+    adb -s 127.0.0.1:5555 install -r "$PREVIEW_APK"
+    echo "PASS: instalacja osobnej wersji testowej."
+    echo "=== LAUNCH PREVIEW ==="
+    # Failure to launch is a diagnostic error, not a reason to uninstall.
+    if adb -s 127.0.0.1:5555 shell am start --user 0 \
+            -n "$PREVIEW_PACKAGE/pl.jakubzietarski.linumert.mobile.MainActivity" \
+            > "$OUT/launch.txt" 2>&1; then
+        cat "$OUT/launch.txt"
+    else
+        echo "OSTRZEZENIE: automatyczne otwarcie aplikacji nie powiodlo sie."
+        cat "$OUT/launch.txt"
+    fi
+    echo "=== WEBHMI HEALTH ==="
+    # This is just a check for the simulator, NOT a control-plane test.
+    health_ok=0
+    for ((attempt=1; attempt<=20; attempt++)); do
+        if python3 - "$OUT/health.json" <<'PY'
+import json
+import sys
+from urllib.request import urlopen
+try:
+    with urlopen("http://127.0.0.1:8765/api/health", timeout=0.7) as response:
+        obj = json.load(response)
+        if response.status != 200 or obj.get("ok") is not True or obj.get("schema") != 1:
+            raise ValueError("health contract mismatch")
+    with open(sys.argv[1], "w", encoding="utf-8") as output:
+        json.dump(obj, output, indent=2)
+    raise SystemExit(0)
+except Exception:
+    raise SystemExit(1)
+PY
+        then
+            echo "PASS: lokalny WebHMI odpowiada na /api/health."
+            health_ok=1
+            break
+        fi
+        sleep 0.5
+    done
+    if [ "$health_ok" -ne 1 ]; then
+        echo "OSTRZEZENIE: instalacja przeszla, ale WebHMI /api/health nie zostal potwierdzony."
+        echo "Sprawdz status w aplikacji, potem przeslij log lub zrzut ekranu."
+    fi
 fi
 completed=1
 echo "=== END ==="
