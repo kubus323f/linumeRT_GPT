@@ -67,7 +67,8 @@ def start() -> str:
         gateway = Gateway(FakeBackend(_demo_machine()))
         app = create_app(gateway, token)
         config = uvicorn.Config(app, host=HOST, port=PORT, log_level="error",
-                                access_log=False, ws_max_size=8192)
+                                access_log=False, ws="wsproto", http="h11",
+                                ws_max_size=8192)
         server = uvicorn.Server(config)
         _failure = None
         _server, _token, _gateway = server, token, gateway
