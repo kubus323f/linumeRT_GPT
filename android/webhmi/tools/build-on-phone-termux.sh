@@ -116,15 +116,16 @@ echo "=== BUILD EXPERIMENTAL LOCAL WEBHMI ==="
 AAPT2=""
 AAPT2_PROBE="$OUT/aapt2-probe.txt"
 : > "$AAPT2_PROBE"
+# Prefer the already configured ARM64 build-tools/36.0.0 from AndroidForge.
+# Every path is nevertheless checked for CPU architecture AND actual startup.
 candidates=(
     "${LINUMERT_AAPT2:-}"
+    "$SDK/build-tools/36.0.0/aapt2"
     "${PREFIX:-/data/data/com.termux/files/usr}/bin/aapt2"
     "$(command -v aapt2 || true)"
     "$HOME/bin/aapt2"
-    "$HOME/android-sdk/build-tools/34.0.4/aapt2"
-    "$SDK/build-tools/34.0.4/aapt2"
     "$SDK/build-tools/35.0.0/aapt2"
-    "$SDK/build-tools/36.0.0/aapt2"
+    "$SDK/build-tools/34.0.4/aapt2"
 )
 # Scan installed SDK tools too, but independently verify ELF architecture.
 if [ -d "$SDK/build-tools" ]; then
