@@ -98,6 +98,14 @@ class WebHmiLifecycleTest(unittest.TestCase):
         self.assertTrue(FakeGateway.instances[0].stopped)
         self.assertEqual(json.loads(self.runtime.status())["state"], "STOPPED")
 
+    def test_missing_dependency_does_not_claim_server_started(self):
+        # Fail closed if pydantic-core or another dependency is unavailable.
+        with patch.dict(sys.modules, {"linumert_webhmi.backend": None}):
+            with self.assertRaises(ImportError):
+                self.runtime.start()
+        self.assertEqual(json.loads(self.runtime.status())["state"], "STOPPED")
+        self.assertEqual(FakeServer.instances, [])
+
     def test_start_rejects_parallel_stop(self):
         self.runtime.start()
         FakeServer.instances[0].should_exit = True
