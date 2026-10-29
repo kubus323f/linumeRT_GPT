@@ -22,8 +22,7 @@ final class WifiInterface {
         try {
             for (Network n : cm.getAllNetworks()) {
                 NetworkCapabilities cap = cm.getNetworkCapabilities(n);
-                if (cap == null || !cap.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)
-                        || !cap.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) {
+                if (cap == null || !cap.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
                     continue;
                 }
                 LinkProperties link = cm.getLinkProperties(n);
@@ -37,7 +36,7 @@ final class WifiInterface {
                     }
                 }
             }
-        } catch (SecurityException | RuntimeException denied) {
+        } catch (RuntimeException denied) {
             // No permission or restricted OEM network service => no Wi-Fi sharing.
         }
         return "";
