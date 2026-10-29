@@ -65,7 +65,7 @@ jobs:
           APK="android/webhmi/app/build/outputs/apk/debug/app-debug.apk"
           test -s "$APK"
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | tee android-apk-metadata.txt
-          grep -q "package: name='pl.jakubzietarski.linumert.mobile' versionCode='2'" android-apk-metadata.txt
+          grep -q "package: name='pl.jakubzietarski.linumert.mobile.preview' versionCode='2'" android-apk-metadata.txt
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$APK"
           sha256sum "$APK" | tee android-apk-sha256.txt
       - uses: actions/upload-artifact@v4
