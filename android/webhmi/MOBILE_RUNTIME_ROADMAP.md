@@ -77,3 +77,22 @@ for any missing Android-native dependency.
 - After installation, a diagnostic launch and loopback health probe are attempted. A successful APK install is never treated as proven WebHMI operation.
 - A future in-place migration to the original package requires its original signing key; no unattended uninstall or destructive data migration.
 - On-device installation and runtime smoke results for the new preview are still PENDING.
+
+## 2026-10-29 dev3: browser and LAN sharing (not yet device qualified)
+- User screenshot demonstrates that dev2 embedded CPython 3.13 and actual
+  WebHMI FakeBackend can serve an authenticated operator page on localhost.
+- Added external Android browser entry, optional embedded WebView, token
+  show/copy controls, and an independently scrollable server manager screen.
+- Added explicit opt-in private Wi-Fi IPv4 listener: same ASGI server is
+  bound to explicit loopback and active Wi-Fi IP, never 0.0.0.0.
+- Added authenticated health verification for both endpoints and active
+  Wi-Fi Network callback. Sharing is revoked on Wi-Fi network loss or IP
+  reconfiguration; no automatic public interface fallback.
+- Foreground service notification shows active exposure and supports STOP.
+  Activity displays current server state on returning from the browser.
+- Fixed WebSocket Command parsing for Pydantic v1 used in Chaquopy;
+  desktop Pydantic v2 remains supported.
+- Preview package versionCode 3; original production app remains untouched.
+- Device build/install, second-device browser/WebSocket acceptance,
+  screen-off/power and Wi-Fi reconnect tests are PENDING.
+- Complete instructions: android/webhmi/WIFI_BROWSER_ACCESS.md.
