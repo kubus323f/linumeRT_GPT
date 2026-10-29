@@ -9,7 +9,7 @@ Szczegóły: [plan autonomicznego runtime](MOBILE_RUNTIME_ROADMAP.md).
 
 ## Warianty wykonawcze
 
-- Standardowy `assembleDebug`: wbudowany Python 3.11 i diagnostyczny lokalny
+- Standardowy `assembleDebug`: wbudowany Python 3.13 i diagnostyczny lokalny
   serwer `127.0.0.1:8766/probe`. Nie jest to serwer WebHMI.
 - Eksperymentalny `assembleDebug -PlinumertFullWebHmi=true`: próba spakowania
   istniejących źródeł `linumert` i `linumert_webhmi`, FastAPI, Uvicorn,
