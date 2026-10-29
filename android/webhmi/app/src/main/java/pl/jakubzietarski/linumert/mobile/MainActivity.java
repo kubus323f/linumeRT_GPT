@@ -484,6 +484,17 @@ public final class MainActivity extends Activity {
     }
 
     @Override
+    protected void onResume() {
+        super.onResume();
+        // Refresh the actual process state after a browser visit, network
+        // revocation or Android recreation. Never trust the old Wi-Fi label.
+        if (BuildConfig.LOCAL_WEBHMI_ENABLED && web != null
+                && !probing.get() && !localStarting.get()) {
+            startLocalWebHmi();
+        }
+    }
+
+    @Override
     protected void onStop() {
         if (tokenDisplay != null) tokenDisplay.setText("Token ukryty");
         closeServer("Aplikacja w tle — panel zamknięty, serwer nadal działa.");
