@@ -87,7 +87,7 @@ else
         "$REPOSITORY"|"https://github.com/kubus323f/linumeRT_GPT") ;;
         *) echo "ERROR: Nieoczekiwane repozytorium w katalogu roboczym"; exit 5 ;;
     esac
-    if [ -n "$(git -C "$WORK" status --porcelain)" ]; then
+    if [ -n "$(git -C "$WORK" status --porcelain --untracked-files=no)" ]; then
         echo "ERROR: Lokalne zmiany w repozytorium; nie nadpisuje ich."
         exit 5
     fi
