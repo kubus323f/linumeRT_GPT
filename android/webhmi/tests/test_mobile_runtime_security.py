@@ -29,6 +29,7 @@ class LocalRuntimeSecurityTests(unittest.TestCase):
         root = ET.parse(ROOT / "app/src/main/AndroidManifest.xml").getroot()
         perms = {p.get(ANDROID + "name") for p in root.findall("uses-permission")}
         for required in ("android.permission.INTERNET",
+                         "android.permission.ACCESS_NETWORK_STATE",
                          "android.permission.FOREGROUND_SERVICE",
                          "android.permission.FOREGROUND_SERVICE_SPECIAL_USE"):
             self.assertIn(required, perms)
@@ -52,12 +53,12 @@ class LocalRuntimeSecurityTests(unittest.TestCase):
     def test_server_only_kept_after_authentic_health(self):
         src = (ROOT / "app/src/main/java/pl/jakubzietarski/linumert/mobile/MainActivity.java")
         text = src.read_text(encoding="utf-8")
-        self.assertIn("LocalWebHmiClient.start(getApplicationContext())", text)
+        self.assertIn("LocalWebHmiClient.start(", text)
         self.assertIn("if (result == null)", text)
-        self.assertIn("LocalServerService.retain(this)", text)
+        self.assertIn("LocalServerService.retain(this, activeWifiIp)", text)
         client = (src.parent / "LocalWebHmiClient.java").read_text(encoding="utf-8")
-        self.assertIn('request("/api/health", null)', client)
-        self.assertIn('request("/api/state", token)', client)
+        self.assertIn('request(base, "/api/health", null)', client)
+        self.assertIn('request(base, "/api/state", token)', client)
         self.assertIn("MobileRuntimePolicy.canUseLocalHealth", client)
         self.assertIn("LOCAL_WEBHMI_UNVERIFIED_", client)
 
