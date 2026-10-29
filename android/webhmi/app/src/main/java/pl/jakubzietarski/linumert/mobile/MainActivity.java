@@ -47,7 +47,11 @@ public final class MainActivity extends Activity {
     private boolean connected;
     private SharedPreferences prefs;
     private TextView runtimeStatus;
+    private TextView localServerStatus;
+    private volatile String localSessionToken;
     private final java.util.concurrent.atomic.AtomicBoolean probing =
+            new java.util.concurrent.atomic.AtomicBoolean(false);
+    private final java.util.concurrent.atomic.AtomicBoolean localStarting =
             new java.util.concurrent.atomic.AtomicBoolean(false);
 
     @Override
@@ -111,6 +115,20 @@ public final class MainActivity extends Activity {
         runtimeStatus = label("Sprawdzanie Chaquopy…", 12, MUTED);
         root.addView(runtimeStatus);
         root.addView(action("Sprawdź środowisko lokalne", this::checkEmbeddedRuntime));
+        localServerStatus = label(BuildConfig.LOCAL_WEBHMI_ENABLED
+                ? "Lokalny serwer WebHMI: nieuruchomiony"
+                : "WebHMI lokalnie niedostępne w tej wersji APK; dostępny serwer zdalny.",
+                12, MUTED);
+        root.addView(localServerStatus);
+        if (BuildConfig.LOCAL_WEBHMI_ENABLED) {
+            LinearLayout localActions = new LinearLayout(this);
+            localActions.setOrientation(LinearLayout.HORIZONTAL);
+            localActions.addView(action("Uruchom symulację lokalną", this::startLocalWebHmi),
+                    weighted());
+            localActions.addView(action("Zatrzymaj lokalny serwer", this::stopLocalWebHmi),
+                    weighted());
+            root.addView(localActions);
+        }
 
         web = new WebView(this);
         web.setBackgroundColor(PANEL);
@@ -146,10 +164,71 @@ public final class MainActivity extends Activity {
             }
             final String result = outcome;
             runOnUiThread(() -> {
-                if (!isFinishing() && !isDestroyed() && runtimeStatus != null)
+                if (!isFinishing() && !isDestroyed() && runtimeStatus != null) {
                     runtimeStatus.setText(result);
+                    if (BuildConfig.LOCAL_WEBHMI_ENABLED && result.startsWith("PASS:"))
+                        startLocalWebHmi();
+                }
             });
         }, "linumert-python-check").start();
+    }
+
+    private void startLocalWebHmi() {
+        if (!BuildConfig.LOCAL_WEBHMI_ENABLED || !localStarting.compareAndSet(false, true))
+            return;
+        localServerStatus.setText("Uruchamianie i uwierzytelniona kontrola WebHMI…");
+        new Thread(() -> {
+            LocalWebHmiClient.StartResult ready = null;
+            String problem = null;
+            try {
+                ready = LocalWebHmiClient.start(getApplicationContext());
+            } catch (Throwable failure) {
+                problem = failure.getClass().getSimpleName() + ": "
+                        + String.valueOf(failure.getMessage());
+            } finally {
+                localStarting.set(false);
+            }
+            final LocalWebHmiClient.StartResult result = ready;
+            final String error = problem;
+            runOnUiThread(() -> {
+                if (isFinishing() || isDestroyed()) return;
+                if (result == null) {
+                    localServerStatus.setText("Serwer lokalny NIEGOTOWY: " + error
+                            + ". Zdalny serwer nadal jest dostępny.");
+                    return;
+                }
+                localSessionToken = result.token;
+                localServerStatus.setText(
+                        "PASS: WebHMI 127.0.0.1:8765, symulacja bez sterowania sprzętem.");
+                address.setText(result.address);
+                allowLocalHttp.setChecked(true);
+                openServer();
+            });
+        }, "linumert-webhmi-start").start();
+    }
+
+    private void stopLocalWebHmi() {
+        if (!BuildConfig.LOCAL_WEBHMI_ENABLED) return;
+        if (localStarting.get()) {
+            localServerStatus.setText("Trwa uruchamianie. Spróbuj zatrzymać po zakończeniu.");
+            return;
+        }
+        localSessionToken = null;
+        closeServer("Zamykanie lokalnej sesji");
+        localServerStatus.setText("Zatrzymywanie serwera…");
+        new Thread(() -> {
+            String outcome;
+            try {
+                outcome = LocalWebHmiClient.stop();
+            } catch (Throwable failure) {
+                outcome = "STOP_FAILED_" + failure.getClass().getSimpleName();
+            }
+            final String report = outcome;
+            runOnUiThread(() -> {
+                if (!isFinishing() && !isDestroyed())
+                    localServerStatus.setText("Serwer lokalny: " + report);
+            });
+        }, "linumert-webhmi-stop").start();
     }
 
     private int dp(int n) {
@@ -189,6 +268,9 @@ public final class MainActivity extends Activity {
             return;
         }
         selectedOrigin = url;
+        // A local simulation token must never be transferred to another origin.
+        if (!LocalWebHmiClient.LOCAL_URL.equals(url.toString()))
+            localSessionToken = null;
         prefs.edit().putString("server_url", url.toString()).apply();
         InputMethodManager keyboard = (InputMethodManager) getSystemService(
                 Context.INPUT_METHOD_SERVICE);
@@ -260,6 +342,20 @@ public final class MainActivity extends Activity {
         public void onPageFinished(WebView view, String url) {
             if (connected && ServerUrlPolicy.sameOrigin(selectedOrigin, url)) {
                 status.setText("Panel otwarty. Uwierzytelnij tokenem WebHMI.");
+                // Only the locally launched and authenticated FakeBackend receives this
+                // short-lived secret. It is never stored or appended to a URL.
+                if (localSessionToken != null
+                        && LocalWebHmiClient.LOCAL_URL.equals(selectedOrigin.toString())) {
+                    String quoted = org.json.JSONObject.quote(localSessionToken);
+                    view.evaluateJavascript(
+                        "(function(){let n=0;function join(){"
+                        + "const t=document.getElementById('token');"
+                        + "const b=document.getElementById('connect');"
+                        + "if(t&&b&&document.readyState==='complete'){"
+                        + "t.value=" + quoted + ";b.click();t.value='';"
+                        + "}else if(++n<15){setTimeout(join,120);}}"
+                        + "setTimeout(join,300);})();", null);
+                }
             }
         }
     }
