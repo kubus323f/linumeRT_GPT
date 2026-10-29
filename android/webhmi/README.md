@@ -13,18 +13,24 @@ Szczegóły: [plan autonomicznego runtime](MOBILE_RUNTIME_ROADMAP.md).
   serwer `127.0.0.1:8766/probe`. Nie jest to serwer WebHMI.
 - Eksperymentalny `assembleDebug -PlinumertFullWebHmi=true`: próba spakowania
   istniejących źródeł `linumert` i `linumert_webhmi`, FastAPI, Uvicorn,
-  WebSockets i Pydantic. Po uruchomieniu aplikacja próbuje wystartować
+  wsproto i Pydantic 1.10.24 w wariancie pure Python. Po uruchomieniu aplikacja próbuje wystartować
   `FakeBackend` na `127.0.0.1:8765`, potwierdza endpointy
   `/api/health` i uwierzytelniony `/api/state`, a dopiero potem otwiera panel.
   Komunikat błędu pozostawia możliwość połączenia z serwerem zdalnym.
 
 Wariant eksperymentalny **nie jest jeszcze skompilowany ani przetestowany na
-Androidzie 16**. Androidowe koła binarne (`wheels`) pakietu `pydantic-core`
-muszą być zgodne z Chaquopy, wersją Pythona i rozmiarem stron pamięci.
-Plików binarnych Linuksa nie należy instalować w ich miejsce.
+Androidzie 16**. Zamiast zależeć od natywnego `pydantic-core` używa kompatybilnego
+z FastAPI Pydantic 1.10.24 (pakiet pure Python). Pozostałe wymagania pakietowe
+muszą zostać sprawdzone w rzeczywistej kompilacji Chaquopy.
 
 Serwer nie uruchamia LinuxCNC na telefonie i nie zastępuje sterownika
-ruchu. Autonomiczna usługa działająca w tle oraz PRoot są kolejnymi etapami.
+ruchu. Eksperymentalny serwer lokalny ma usługę pierwszoplanową Androida z
+powiadomieniem i zatrzymywaniem; zgodność i stabilność tej usługi nie są jeszcze
+zweryfikowane na urządzeniu. PRoot pozostaje dalszym etapem.
+
+Lokalny serwer nigdy nie podmienia zdalnego połączenia z maszyną. Przy awarii
+wbudowanego serwera aplikacja może automatycznie wrócić tylko do poprzednio
+wybranego przez użytkownika adresu **HTTPS**, bez automatycznego uwierzytelniania.
 
 ## Pobranie i instalacja APK
 1. Otwórz [Android WebHMI APK — GitHub Actions](https://github.com/kubus323f/linumeRT_GPT/actions/workflows/android-apk.yml).
@@ -64,7 +70,9 @@ Uwaga: \`--host 0.0.0.0\` może kolidować z kontrolą Host; używaj konkretnego
   a instalacja nowszego pliku może wymagać odinstalowania poprzedniej wersji.
   Do trwałych aktualizacji potrzebny jest stały klucz podpisywania, poza repozytorium.
 - Android 10+ (minSdk 29); Android 16/HyperOS 3 obsługiwany (targetSdk 35).
-- Offline nie działa bez serwera. Brak uprawnień ADB/root; tylko dostęp do sieci.
+- Standardowy wariant nie działa offline bez zewnętrznego WebHMI. Wariant
+  eksperymentalny ma działać offline z własnym serwerem symulacji, ale nie jest
+  jeszcze zweryfikowany. Nie są potrzebne uprawnienia ADB/root.
 - GPL-2.0-or-later.
 
 ## Kompilacja lokalna (opcjonalnie)
