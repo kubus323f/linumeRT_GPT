@@ -102,6 +102,10 @@ class WebHmiLifecycleTest(unittest.TestCase):
         self.runtime.start()
         FakeServer.instances[0].should_exit = True
         self.assertIn(self.runtime.stop(), ("STOPPED", "STOP_PENDING"))
+        for _ in range(50):
+            if FakeGateway.instances[0].stopped:
+                break
+            time.sleep(0.01)
         self.assertTrue(FakeGateway.instances[0].stopped)
 
 
