@@ -8,7 +8,6 @@ import com.chaquo.python.android.AndroidPlatform;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
-import java.net.InetSocketAddress;
 import java.net.Proxy;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
@@ -28,7 +27,6 @@ final class ChaquopyProbe {
         connection.setInstanceFollowRedirects(false);
         try {
             if (connection.getResponseCode() != 200) throw new IllegalStateException("PROBE_HTTP");
-            byte[] buffer = new byte[2048];
             String content;
             try (BufferedReader br = new BufferedReader(
                     new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8))) {
