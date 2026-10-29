@@ -19,7 +19,27 @@
 - No continuous Android foreground service yet; probe lifetime is process-dependent.
 - S1 source tests can run without device. **Android APK build/install remains unverified on the phone**.
 
-## Stage S2 — full Chaquopy simulation backend
+## Stage S2 — full Chaquopy simulation backend (EXPERIMENTAL SOURCE IMPLEMENTED)
+
+Experimental build switch:
+```sh
+gradle --no-daemon -p android/webhmi :app:assembleDebug -PlinumertFullWebHmi=true
+```
+This switch bundles original sources from `core/linumert` and `webhmi/server/linumert_webhmi`
+using Chaquopy sourceSets, and requests pinned FastAPI/Uvicorn/WebSockets/Pydantic
+dependencies. It instantiates `FakeBackend` only. The default build does not download
+those dependencies and remains a remote client with an embedded Python diagnostics probe.
+
+The Android app automatically tries the local server in the experimental build,
+requires both `/api/health` and authenticated `/api/state` to pass before connecting,
+and uses a per-session token held only in process memory. On error it leaves the
+remote client available. No successful wheel resolution, Gradle build or device test
+has yet been confirmed. A missing `pydantic-core` Android wheel must fail the
+experimental build rather than silently substituting Linux binaries.
+
+**S2 remains NOT ACCEPTED until real-APK tests pass.**
+
+## S2 acceptance criteria / outstanding implementation
 1. Resolve dependency compatibility first. Existing `linumert_webhmi` requires FastAPI, Uvicorn and Pydantic 2 including native `pydantic-core`. Android wheels must match CPython, ABI and page size; ordinary manylinux wheels are NOT substitutes.
 2. Package original `core/linumert` and `webhmi/server/linumert_webhmi` Python sources and web static files in the APK; avoid copying/reimplementing machine semantics.
 3. Instantiate only FakeBackend; expose WebHMI on `127.0.0.1:8765` with per-start random token and same-origin loopback policy.
@@ -43,6 +63,6 @@
 - S1 Python probe tests: PASS only once executed against committed source.
 - S1 Gradle/Chaquopy build: PENDING.
 - S1 APK on Android 16 / HyperOS: PENDING.
-- S2 actual local WebHMI: NOT IMPLEMENTED.
+- S2 original local WebHMI startup: experimental code implemented; build, package compatibility, real API tests and Android validation PENDING.
 - S3 PRoot: NOT IMPLEMENTED.
 - Real hardware control: OUT OF SCOPE.
