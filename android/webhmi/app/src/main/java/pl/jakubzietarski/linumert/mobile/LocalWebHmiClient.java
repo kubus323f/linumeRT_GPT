@@ -34,7 +34,12 @@ final class LocalWebHmiClient {
         Exception last = null;
         for (int i = 0; i < 25; i++) {
             try {
-                if (verify(token)) return new StartResult(token, LOCAL_URL);
+                JSONObject runtime = new JSONObject(Python.getInstance()
+                        .getModule("mobile_webhmi").callAttr("status").toString());
+                if ("READY".equals(runtime.optString("state")) && verify(token))
+                    return new StartResult(token, LOCAL_URL);
+                if ("FAILED".equals(runtime.optString("state")))
+                    throw new IllegalStateException("LOCAL_SERVER_FAILED");
             } catch (Exception failed) {
                 last = failed;
             }
