@@ -3,7 +3,15 @@ plugins {
     id 'com.chaquo.python'
 }
 
+// Opt-in experiment; standard APK remains a functional remote client even when
+// Android wheels for pydantic-core are unavailable.
+def fullWebHmi = providers.gradleProperty("linumertFullWebHmi")
+    .map { it.toBoolean() }.getOrElse(false)
+
 android {
+    buildFeatures {
+        buildConfig true
+    }
     namespace 'pl.jakubzietarski.linumert.mobile'
     compileSdk 35
 
@@ -11,6 +19,7 @@ android {
         applicationId 'pl.jakubzietarski.linumert.mobile'
         minSdk 29
         targetSdk 35
+        buildConfigField 'boolean', 'LOCAL_WEBHMI_ENABLED', fullWebHmi.toString()
         ndk {
             abiFilters 'arm64-v8a'
         }
@@ -34,5 +43,23 @@ android {
 chaquopy {
     defaultConfig {
         version '3.11'
+        if (fullWebHmi) {
+            // This build is deliberately strict: no substitute for a verified Android wheel.
+            pip {
+                install 'fastapi==0.115.6'
+                install 'uvicorn==0.34.0'
+                install 'websockets==14.2'
+                install 'pydantic==2.10.6'
+            }
+            extractPackages("linumert_webhmi")
+        }
+    }
+    if (fullWebHmi) {
+        sourceSets {
+            getByName("main") {
+                srcDir("../../../core")
+                srcDir("../../../webhmi/server")
+            }
+        }
     }
 }
