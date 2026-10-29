@@ -193,6 +193,7 @@ public final class MainActivity extends Activity {
             runOnUiThread(() -> {
                 if (isFinishing() || isDestroyed()) return;
                 if (result == null) {
+                    localSessionToken = null;
                     localServerStatus.setText("Serwer lokalny NIEGOTOWY: " + error
                             + ". Zdalny serwer nadal jest dostępny.");
                     return;
@@ -271,7 +272,8 @@ public final class MainActivity extends Activity {
         // A local simulation token must never be transferred to another origin.
         if (!LocalWebHmiClient.LOCAL_URL.equals(url.toString()))
             localSessionToken = null;
-        prefs.edit().putString("server_url", url.toString()).apply();
+        if (!LocalWebHmiClient.LOCAL_URL.equals(url.toString()))
+            prefs.edit().putString("server_url", url.toString()).apply();
         InputMethodManager keyboard = (InputMethodManager) getSystemService(
                 Context.INPUT_METHOD_SERVICE);
         if (keyboard != null) {
