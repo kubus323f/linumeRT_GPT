@@ -27,6 +27,11 @@ android {
     }
 
     buildTypes {
+        // Preview is installed next to the existing v1 app. Android refuses to
+        // update v1 with a different signing key, so preserve it and its data.
+        debug {
+            applicationIdSuffix '.preview'
+        }
         release {
             minifyEnabled false
         }
