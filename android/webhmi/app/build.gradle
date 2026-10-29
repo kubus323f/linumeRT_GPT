@@ -1,8 +1,16 @@
 plugins {
     id 'com.android.application'
+    id 'com.chaquo.python'
 }
 
+// Opt-in experiment; standard APK remains a functional remote client even when
+// Android wheels for pydantic-core are unavailable.
+def fullWebHmi = providers.gradleProperty("linumertFullWebHmi").map { it.toBoolean() }.getOrElse(false)
+
 android {
+    buildFeatures {
+        buildConfig true
+    }
     namespace 'pl.jakubzietarski.linumert.mobile'
     compileSdk 35
 
@@ -10,11 +18,20 @@ android {
         applicationId 'pl.jakubzietarski.linumert.mobile'
         minSdk 29
         targetSdk 35
-        versionCode 1
-        versionName '0.1.0-dev.1'
+        buildConfigField 'boolean', 'LOCAL_WEBHMI_ENABLED', fullWebHmi.toString()
+        ndk {
+            abiFilters 'arm64-v8a'
+        }
+        versionCode 3
+        versionName '0.3.0-dev.3'
     }
 
     buildTypes {
+        // Preview is installed next to the existing v1 app. Android refuses to
+        // update v1 with a different signing key, so preserve it and its data.
+        debug {
+            applicationIdSuffix '.preview'
+        }
         release {
             minifyEnabled false
         }
@@ -23,5 +40,30 @@ android {
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+// Stage 1: CPython loopback diagnostic only. No machine-control backend is bundled.
+chaquopy {
+    defaultConfig {
+        version '3.13'
+        if (fullWebHmi) {
+            // This build is deliberately strict: no substitute for a verified Android wheel.
+            pip {
+                install 'fastapi==0.115.6'
+                install 'uvicorn==0.34.0'
+                install 'wsproto==1.2.0'
+                install 'pydantic==1.10.24'
+            }
+            extractPackages("linumert_webhmi")
+        }
+    }
+    if (fullWebHmi) {
+        sourceSets {
+            getByName("main") {
+                srcDir("../../../core")
+                srcDir("../../../webhmi/server")
+            }
+        }
     }
 }

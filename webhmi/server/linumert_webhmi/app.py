@@ -184,7 +184,11 @@ async def _serve(socket: WebSocket, gateway: Gateway, session: str) -> None:
             try:
                 data = json.loads(text)
                 msg_id = data.get("id") if isinstance(data, dict) else None
-                command = Command.model_validate(data)
+                # Chaquopy uses Pydantic v1 without pydantic-core; desktop v2
+                # retains model_validate. The same Command validation applies.
+                command = (Command.model_validate(data)
+                           if hasattr(Command, "model_validate")
+                           else Command.parse_obj(data))
                 await asyncio.to_thread(gateway.execute, command, session)
                 await socket.send_json({"type": "ack", "id": msg_id})
             except (ValueError, ValidationError) as error:

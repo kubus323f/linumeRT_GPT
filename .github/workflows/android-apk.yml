@@ -26,6 +26,20 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Runtime policy and Python probe tests without Android SDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s android/webhmi/tests -p 'test_*.py' -v
+          mkdir -p "$RUNNER_TEMP/linumert-runtime-tests"
+          javac -d "$RUNNER_TEMP/linumert-runtime-tests" \
+            android/webhmi/app/src/main/java/pl/jakubzietarski/linumert/mobile/MobileRuntimePolicy.java \
+            android/webhmi/tests/MobileRuntimePolicyTest.java
+          java -cp "$RUNNER_TEMP/linumert-runtime-tests" \
+            pl.jakubzietarski.linumert.mobile.MobileRuntimePolicyTest
       - name: URL/origin policy tests without Android SDK
         shell: bash
         run: |
@@ -51,7 +65,7 @@ jobs:
           APK="android/webhmi/app/build/outputs/apk/debug/app-debug.apk"
           test -s "$APK"
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | tee android-apk-metadata.txt
-          grep -q "package: name='pl.jakubzietarski.linumert.mobile' versionCode='1'" android-apk-metadata.txt
+          grep -q "package: name='pl.jakubzietarski.linumert.mobile.preview' versionCode='3'" android-apk-metadata.txt
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$APK"
           sha256sum "$APK" | tee android-apk-sha256.txt
       - uses: actions/upload-artifact@v4
