@@ -46,6 +46,9 @@ public final class MainActivity extends Activity {
     private URI selectedOrigin;
     private boolean connected;
     private SharedPreferences prefs;
+    private TextView runtimeStatus;
+    private final java.util.concurrent.atomic.AtomicBoolean probing =
+            new java.util.concurrent.atomic.AtomicBoolean(false);
 
     @Override
     protected void onCreate(Bundle savedState) {
@@ -103,6 +106,12 @@ public final class MainActivity extends Activity {
                 12, MUTED);
         root.addView(status);
 
+        // A proof of embedded CPython: this is not the LinuxCNC WebHMI server.
+        root.addView(label("Lokalne środowisko (automatyczna diagnostyka)", 12, ACCENT));
+        runtimeStatus = label("Sprawdzanie Chaquopy…", 12, MUTED);
+        root.addView(runtimeStatus);
+        root.addView(action("Sprawdź środowisko lokalne", this::checkEmbeddedRuntime));
+
         web = new WebView(this);
         web.setBackgroundColor(PANEL);
         web.getSettings().setJavaScriptEnabled(true);
@@ -119,6 +128,28 @@ public final class MainActivity extends Activity {
         web.setWebViewClient(new GuardedClient());
         root.addView(web, new LinearLayout.LayoutParams(-1, 0, 1));
         web.loadUrl("about:blank");
+        checkEmbeddedRuntime();
+    }
+
+    private void checkEmbeddedRuntime() {
+        if (!probing.compareAndSet(false, true)) return;
+        if (runtimeStatus != null) runtimeStatus.setText("Sprawdzam lokalny Python…");
+        new Thread(() -> {
+            String outcome;
+            try {
+                outcome = ChaquopyProbe.startAndVerify(getApplicationContext());
+            } catch (Throwable error) {
+                outcome = "NIEDOSTĘPNE: " + error.getClass().getSimpleName()
+                        + ". WebHMI wymaga rzeczywistego serwera; użyj zdalnego połączenia.";
+            } finally {
+                probing.set(false);
+            }
+            final String result = outcome;
+            runOnUiThread(() -> {
+                if (!isFinishing() && !isDestroyed() && runtimeStatus != null)
+                    runtimeStatus.setText(result);
+            });
+        }, "linumert-python-check").start();
     }
 
     private int dp(int n) {
