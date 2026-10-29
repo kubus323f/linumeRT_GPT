@@ -27,9 +27,10 @@ public final class LocalServerService extends Service {
     private static final int NOTIFICATION_ID = 8765;
     private final AtomicBoolean stopping = new AtomicBoolean(false);
 
-    static void retain(Context context) {
+    static void retain(Context context, String wifiIp) {
         Intent intent = new Intent(context, LocalServerService.class);
         intent.setAction(ACTION_KEEP_ALIVE);
+        intent.putExtra("wifi_ip", wifiIp == null ? "" : wifiIp);
         if (Build.VERSION.SDK_INT >= 26) context.startForegroundService(intent);
         else context.startService(intent);
     }
@@ -86,10 +87,14 @@ public final class LocalServerService extends Service {
                 PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
         Notification.Builder builder = Build.VERSION.SDK_INT >= 26
                 ? new Notification.Builder(this, CHANNEL) : new Notification.Builder(this);
+        String approvedWifi = intent == null ? "" : intent.getStringExtra("wifi_ip");
+        if (approvedWifi == null) approvedWifi = "";
         Notification notification = builder
                 .setSmallIcon(android.R.drawable.stat_notify_sync)
-                .setContentTitle("linumeRT — lokalny serwer symulacji")
-                .setContentText("127.0.0.1:8765 · Bez sterowania fizyczną maszyną")
+                .setContentTitle("linumeRT — serwer symulacji działa")
+                .setContentText(approvedWifi.isEmpty()
+                        ? "Tylko telefon: 127.0.0.1:8765"
+                        : "Wi-Fi: " + approvedWifi + ":8765 · HTTP bez szyfrowania")
                 .setContentIntent(openIntent)
                 .addAction(android.R.drawable.ic_media_pause, "Zatrzymaj", stopIntent)
                 .setOngoing(true).build();
