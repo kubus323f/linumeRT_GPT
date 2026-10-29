@@ -58,7 +58,7 @@ if sys.version_info[:2] != (3, 13):
     raise SystemExit("ERROR: ta galaz wymaga host Python 3.13 dla Chaquopy 3.13")
 PY
 java -version
-gradle --version | head -n 20
+gradle --version
 
 SDK=""
 for candidate in "${ANDROID_HOME:-}" "${ANDROID_SDK_ROOT:-}" "$HOME/android-sdk"; do
