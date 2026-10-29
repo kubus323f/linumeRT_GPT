@@ -17,7 +17,9 @@ Szczegóły: [plan autonomicznego runtime](MOBILE_RUNTIME_ROADMAP.md).
   `/api/health` i uwierzytelniony `/api/state`, a dopiero potem otwiera panel.
   Komunikat błędu pozostawia możliwość połączenia z serwerem zdalnym.
 
-Poprzedni wariant dev2 **został skompilowany i uruchomiony na Androidzie 16**,\nco potwierdza zrzut ekranu operatora i komunikaty lokalnych usług. Nowy\nwariant dev3 z przeglądarką i Wi-Fi **wymaga osobnej weryfikacji na urządzeniu**. Zamiast zależeć od natywnego `pydantic-core` używa kompatybilnego
+Poprzedni wariant dev2 **został skompilowany i uruchomiony na Androidzie 16**,
+co potwierdza zrzut ekranu operatora i komunikaty lokalnych usług. Nowy
+wariant dev3 z przeglądarką i Wi-Fi **wymaga osobnej weryfikacji na urządzeniu**. Zamiast zależeć od natywnego `pydantic-core` używa kompatybilnego
 z FastAPI Pydantic 1.10.24 (pakiet pure Python). Pozostałe wymagania pakietowe
 muszą zostać sprawdzone w rzeczywistej kompilacji Chaquopy.
 
