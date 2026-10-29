@@ -146,7 +146,7 @@ resolved = p.resolve()
 try:
     with resolved.open("rb") as stream:
         header = stream.read(20)
-    if header.startswith(b"\\x7fELF"):
+    if header.startswith(bytes([127]) + b"ELF"):
         endian = "little" if header[5] == 1 else "big"
         machine = int.from_bytes(header[18:20], endian)
         if machine != 183:
@@ -155,7 +155,7 @@ try:
         raise RuntimeError("not ELF or an executable wrapper script")
     run = subprocess.run([str(p), "version"], stdout=subprocess.PIPE,
                          stderr=subprocess.STDOUT, text=True, timeout=8, check=False)
-    output = run.stdout.strip().replace("\\n", " ")[:280]
+    output = run.stdout.strip().replace(chr(10), " ")[:280]
     if run.returncode != 0 or "aapt" not in output.lower() or "2" not in output:
         raise RuntimeError(f"version probe failed (exit={run.returncode}): {output}")
     print(f"ACCEPT {p} -> {resolved}: {output}")
