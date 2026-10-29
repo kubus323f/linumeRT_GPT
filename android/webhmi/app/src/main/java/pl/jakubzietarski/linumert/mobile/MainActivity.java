@@ -49,6 +49,7 @@ public final class MainActivity extends Activity {
     private TextView runtimeStatus;
     private TextView localServerStatus;
     private TextView wifiAddress;
+    private TextView tokenDisplay;
     private CheckBox wifiShare;
     private CheckBox embeddedPanel;
     private volatile String localSessionToken;
@@ -79,9 +80,16 @@ public final class MainActivity extends Activity {
             });
         }
         setContentView(root);
+        // All controls are scrollable even when the optional WebView is hidden.
+        LinearLayout controls = new LinearLayout(this);
+        controls.setOrientation(LinearLayout.VERTICAL);
+        android.widget.ScrollView controlScroll = new android.widget.ScrollView(this);
+        controlScroll.setFillViewport(false);
+        controlScroll.addView(controls);
+        root.addView(controlScroll, new LinearLayout.LayoutParams(-1, 0, 1));
 
-        root.addView(label("linumeRT · WebHMI", 20, ACCENT));
-        root.addView(label("Panel serwera LinuxCNC — nie zastępuje sprzętowego E-STOP.",
+        controls.addView(label("linumeRT · WebHMI", 20, ACCENT));
+        controls.addView(label("Panel serwera LinuxCNC — nie zastępuje sprzętowego E-STOP.",
                 12, MUTED));
 
         address = new EditText(this);
@@ -92,14 +100,14 @@ public final class MainActivity extends Activity {
         address.setText(prefs.getString("server_url", ""));
         address.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
         address.setTextSize(14);
-        root.addView(address, new LinearLayout.LayoutParams(-1, dp(52)));
+        controls.addView(address, new LinearLayout.LayoutParams(-1, dp(52)));
 
         allowLocalHttp = new CheckBox(this);
         allowLocalHttp.setText("HTTP tylko w prywatnej sieci (token bez szyfrowania)");
         allowLocalHttp.setTextColor(FG);
         allowLocalHttp.setTextSize(12);
         allowLocalHttp.setChecked(false);
-        root.addView(allowLocalHttp);
+        controls.addView(allowLocalHttp);
 
         LinearLayout buttons = new LinearLayout(this);
         buttons.setOrientation(LinearLayout.HORIZONTAL);
@@ -108,22 +116,22 @@ public final class MainActivity extends Activity {
         buttons.addView(action("Odśwież", () -> {
             if (connected && web != null) web.reload();
         }), weighted());
-        root.addView(buttons);
+        controls.addView(buttons);
 
         status = label("Wpisz adres. Domyślnie akceptowane jest wyłącznie HTTPS.",
                 12, MUTED);
-        root.addView(status);
+        controls.addView(status);
 
         // A proof of embedded CPython: this is not the LinuxCNC WebHMI server.
-        root.addView(label("Lokalne środowisko (automatyczna diagnostyka)", 12, ACCENT));
+        controls.addView(label("Lokalne środowisko (automatyczna diagnostyka)", 12, ACCENT));
         runtimeStatus = label("Sprawdzanie Chaquopy…", 12, MUTED);
-        root.addView(runtimeStatus);
-        root.addView(action("Sprawdź środowisko lokalne", this::checkEmbeddedRuntime));
+        controls.addView(runtimeStatus);
+        controls.addView(action("Sprawdź środowisko lokalne", this::checkEmbeddedRuntime));
         localServerStatus = label(BuildConfig.LOCAL_WEBHMI_ENABLED
                 ? "Lokalny serwer WebHMI: nieuruchomiony"
                 : "WebHMI lokalnie niedostępne w tej wersji APK; dostępny serwer zdalny.",
                 12, MUTED);
-        root.addView(localServerStatus);
+        controls.addView(localServerStatus);
         if (BuildConfig.LOCAL_WEBHMI_ENABLED) {
             LinearLayout localActions = new LinearLayout(this);
             localActions.setOrientation(LinearLayout.HORIZONTAL);
@@ -131,27 +139,30 @@ public final class MainActivity extends Activity {
                     weighted());
             localActions.addView(action("Zatrzymaj lokalny serwer", this::stopLocalWebHmi),
                     weighted());
-            root.addView(localActions);
+            controls.addView(localActions);
 
-            root.addView(label("Przeglądarka i dostęp w sieci", 14, ACCENT));
+            controls.addView(label("Przeglądarka i dostęp w sieci", 14, ACCENT));
             LinearLayout browserActions = new LinearLayout(this);
             browserActions.setOrientation(LinearLayout.HORIZONTAL);
             browserActions.addView(action("Otwórz w przeglądarce", this::openLocalBrowser),
                     weighted());
             browserActions.addView(action("Kopiuj token", this::copyLocalToken), weighted());
-            root.addView(browserActions);
+            controls.addView(browserActions);
+            controls.addView(action("Pokaż / ukryj token na ekranie", this::toggleTokenDisplay));
+            tokenDisplay = label("Token ukryty", 12, MUTED);
+            controls.addView(tokenDisplay);
 
             wifiShare = new CheckBox(this);
             wifiShare.setText("Udostępnij symulator w obecnej sieci Wi-Fi (HTTP bez szyfrowania)");
             wifiShare.setTextColor(FG);
             wifiShare.setTextSize(12);
             wifiShare.setChecked(false); // Never implicitly expose the port on a fresh start.
-            root.addView(wifiShare);
-            root.addView(action("Zastosuj ustawienie Wi-Fi", this::configureWifiSharing));
+            controls.addView(wifiShare);
+            controls.addView(action("Zastosuj ustawienie Wi-Fi", this::configureWifiSharing));
             wifiAddress = label("Wi-Fi: wyłączone. Port 8765 tylko na tym telefonie.",
                     12, MUTED);
-            root.addView(wifiAddress);
-            root.addView(action("Kopiuj adres sieciowy", this::copyWifiUrl));
+            controls.addView(wifiAddress);
+            controls.addView(action("Kopiuj adres sieciowy", this::copyWifiUrl));
         }
 
         embeddedPanel = new CheckBox(this);
@@ -159,7 +170,7 @@ public final class MainActivity extends Activity {
         embeddedPanel.setTextSize(12);
         embeddedPanel.setTextColor(FG);
         embeddedPanel.setChecked(false);
-        root.addView(embeddedPanel);
+        controls.addView(embeddedPanel);
 
         web = new WebView(this);
         web.setBackgroundColor(PANEL);
@@ -413,6 +424,17 @@ public final class MainActivity extends Activity {
         }
     }
 
+    private void toggleTokenDisplay() {
+        if (tokenDisplay == null) return;
+        if (localSessionToken == null) {
+            tokenDisplay.setText("Brak aktywnego tokenu.");
+        } else if (tokenDisplay.getText().toString().equals(localSessionToken)) {
+            tokenDisplay.setText("Token ukryty");
+        } else {
+            tokenDisplay.setText(localSessionToken);
+        }
+    }
+
     private void copyLocalToken() {
         if (localSessionToken == null || localSessionToken.isEmpty()) {
             status.setText("Brak aktywnego tokenu lokalnego serwera.");
@@ -456,7 +478,8 @@ public final class MainActivity extends Activity {
 
     @Override
     protected void onStop() {
-        closeServer("Aplikacja w tle — sesja zamknięta. Połącz ponownie.");
+        if (tokenDisplay != null) tokenDisplay.setText("Token ukryty");
+        closeServer("Aplikacja w tle — panel zamknięty, serwer nadal działa.");
         super.onStop();
     }
 
