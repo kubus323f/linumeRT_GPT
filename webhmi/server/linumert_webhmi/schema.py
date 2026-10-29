@@ -14,7 +14,14 @@ import math
 from typing import Literal
 
 from linumert.cnc import MachineSnapshot
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field
+
+# Pydantic 1 is shipped as pure Python on Android; desktop keeps Pydantic 2.
+# Both decorators use identical pre-existing field-validation semantics here.
+try:
+    from pydantic import field_validator
+except ImportError:
+    from pydantic import validator as field_validator  # type: ignore[assignment]
 
 SCHEMA_VERSION = 1
 MAX_MDI_CHARS = 200
