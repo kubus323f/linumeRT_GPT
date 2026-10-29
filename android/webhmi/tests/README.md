@@ -1,6 +1,6 @@
 # Mobile runtime tests
 
-Run offline where Python 3.11 and JDK 17+ are available:
+Run offline where Python 3.13 and JDK 17+ are available:
 
 ```sh
 python3 -m unittest discover -s android/webhmi/tests -p 'test_*.py' -v
