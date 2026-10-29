@@ -42,7 +42,8 @@ class FakeServer:
         self.started = False
         self.should_exit = False
         self.instances.append(self)
-    def run(self):
+    def run(self, sockets=None):
+        self.sockets = sockets
         self.started = True
         while not self.should_exit:
             time.sleep(0.01)
@@ -68,16 +69,27 @@ class WebHmiLifecycleTest(unittest.TestCase):
             "linumert_webhmi.gateway": fake_module(
                 "linumert_webhmi.gateway", Gateway=FakeGateway),
             "linumert_webhmi.app": fake_module(
-                "linumert_webhmi.app", create_app=lambda gateway, token: object()),
+                "linumert_webhmi.app", create_app=lambda gateway, token, extra_hosts=(): object()),
         }
         self.patcher = patch.dict(sys.modules, self.modules)
         self.patcher.start()
         spec = importlib.util.spec_from_file_location("mobile_webhmi_under_test", SOURCE)
         self.runtime = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(self.runtime)
+        # Never bind the actual port when tests run on the phone: the user's
+        # running WebHMI may already own 127.0.0.1:8765.
+        class FakeSocket:
+            def __init__(self, address):
+                self.address = address
+            def close(self):
+                pass
+        self.bind_patch = patch.object(self.runtime, "_bind",
+                                       side_effect=lambda ip: FakeSocket(ip))
+        self.bind_patch.start()
 
     def tearDown(self):
         self.runtime.stop()
+        self.bind_patch.stop()
         self.patcher.stop()
 
     def test_idempotent_start_and_stop(self):
@@ -88,6 +100,8 @@ class WebHmiLifecycleTest(unittest.TestCase):
         self.assertEqual(len(FakeServer.instances), 1)
         self.assertEqual(FakeServer.instances[0].config.options["host"], "127.0.0.1")
         self.assertEqual(FakeServer.instances[0].config.options["port"], 8765)
+        self.assertEqual([s.address for s in FakeServer.instances[0].sockets],
+                         ["127.0.0.1"])
         self.assertTrue(FakeGateway.instances[0].started)
         for _ in range(50):
             if json.loads(self.runtime.status())["state"] == "READY":
@@ -97,6 +111,24 @@ class WebHmiLifecycleTest(unittest.TestCase):
         self.assertEqual(self.runtime.stop(), "STOPPED")
         self.assertTrue(FakeGateway.instances[0].stopped)
         self.assertEqual(json.loads(self.runtime.status())["state"], "STOPPED")
+
+    def test_wifi_dual_bind_and_no_wildcard(self):
+        started = json.loads(self.runtime.start("192.168.1.44"))
+        self.assertEqual(started["wifi_ip"], "192.168.1.44")
+        for _ in range(50):
+            if json.loads(self.runtime.status())["state"] == "READY":
+                break
+            time.sleep(0.01)
+        self.assertEqual([s.address for s in FakeServer.instances[0].sockets],
+                         ["127.0.0.1", "192.168.1.44"])
+        self.assertEqual(self.runtime.stop(), "STOPPED")
+
+    def test_wifi_rejects_public_and_wildcard(self):
+        for ip in ("0.0.0.0", "8.8.8.8", "127.0.0.1", "::", "169.254.1.1",
+                   "192.168.1.5:8765", "unknown-host"):
+            with self.subTest(ip=ip), self.assertRaises(ValueError):
+                self.runtime.start(ip)
+        self.assertEqual(FakeServer.instances, [])
 
     def test_missing_dependency_does_not_claim_server_started(self):
         # Fail closed if pydantic-core or another dependency is unavailable.
