@@ -10,7 +10,7 @@
 
 ## Stage S1 — source implementation in this branch
 - Android WebView client preserved.
-- Chaquopy 17.2 / embedded CPython 3.11 for arm64-v8a declared in Gradle.
+- Chaquopy 17.2 / embedded CPython 3.13 for arm64-v8a declared in Gradle.
 - At Activity launch: launch an idempotent, loopback-only Python probe and show its actual result.
 - Probe listens only on `127.0.0.1:8766/probe`, reports `kind=python-runtime-probe`, `schema=0`, `webhmi=false`.
 - Pure Java backend selection policy and regression tests.
