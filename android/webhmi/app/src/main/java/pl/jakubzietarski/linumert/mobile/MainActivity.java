@@ -48,7 +48,11 @@ public final class MainActivity extends Activity {
     private SharedPreferences prefs;
     private TextView runtimeStatus;
     private TextView localServerStatus;
+    private TextView wifiAddress;
+    private CheckBox wifiShare;
+    private CheckBox embeddedPanel;
     private volatile String localSessionToken;
+    private volatile String activeWifiIp = "";
     private final java.util.concurrent.atomic.AtomicBoolean probing =
             new java.util.concurrent.atomic.AtomicBoolean(false);
     private final java.util.concurrent.atomic.AtomicBoolean localStarting =
@@ -128,7 +132,34 @@ public final class MainActivity extends Activity {
             localActions.addView(action("Zatrzymaj lokalny serwer", this::stopLocalWebHmi),
                     weighted());
             root.addView(localActions);
+
+            root.addView(label("Przeglądarka i dostęp w sieci", 14, ACCENT));
+            LinearLayout browserActions = new LinearLayout(this);
+            browserActions.setOrientation(LinearLayout.HORIZONTAL);
+            browserActions.addView(action("Otwórz w przeglądarce", this::openLocalBrowser),
+                    weighted());
+            browserActions.addView(action("Kopiuj token", this::copyLocalToken), weighted());
+            root.addView(browserActions);
+
+            wifiShare = new CheckBox(this);
+            wifiShare.setText("Udostępnij symulator w obecnej sieci Wi-Fi (HTTP bez szyfrowania)");
+            wifiShare.setTextColor(FG);
+            wifiShare.setTextSize(12);
+            wifiShare.setChecked(false); // Never implicitly expose the port on a fresh start.
+            root.addView(wifiShare);
+            root.addView(action("Zastosuj ustawienie Wi-Fi", this::configureWifiSharing));
+            wifiAddress = label("Wi-Fi: wyłączone. Port 8765 tylko na tym telefonie.",
+                    12, MUTED);
+            root.addView(wifiAddress);
+            root.addView(action("Kopiuj adres sieciowy", this::copyWifiUrl));
         }
+
+        embeddedPanel = new CheckBox(this);
+        embeddedPanel.setText("Pokaż panel wewnątrz aplikacji (zamiast przeglądarki)");
+        embeddedPanel.setTextSize(12);
+        embeddedPanel.setTextColor(FG);
+        embeddedPanel.setChecked(false);
+        root.addView(embeddedPanel);
 
         web = new WebView(this);
         web.setBackgroundColor(PANEL);
@@ -146,6 +177,16 @@ public final class MainActivity extends Activity {
         web.setWebViewClient(new GuardedClient());
         root.addView(web, new LinearLayout.LayoutParams(-1, 0, 1));
         web.loadUrl("about:blank");
+        web.setVisibility(View.GONE);
+        embeddedPanel.setOnCheckedChangeListener((buttonView, visible) -> {
+            web.setVisibility(visible ? View.VISIBLE : View.GONE);
+            if (visible) {
+                // Explicit user action. Background service stays independent of WebView.
+                if (address.getText().length() > 0) openServer();
+            } else {
+                web.loadUrl("about:blank");
+            }
+        });
         if (BuildConfig.LOCAL_WEBHMI_ENABLED) checkEmbeddedRuntime();
         else maybeOpenSecureRemote();
     }
@@ -175,6 +216,25 @@ public final class MainActivity extends Activity {
     }
 
     private void startLocalWebHmi() {
+        startLocalWebHmi(false, "");
+    }
+
+    private void configureWifiSharing() {
+        if (wifiShare == null || localStarting.get()) return;
+        String desired = "";
+        if (wifiShare.isChecked()) {
+            desired = WifiInterface.currentPrivateIpv4(this);
+            if (desired.isEmpty()) {
+                wifiShare.setChecked(!activeWifiIp.isEmpty());
+                wifiAddress.setText("Nie wykryto prywatnego adresu IPv4 na Wi-Fi. "
+                        + "Udostępnianie nie zostało zmienione.");
+                return;
+            }
+        }
+        startLocalWebHmi(true, desired);
+    }
+
+    private void startLocalWebHmi(boolean changeWifiMode, String requestedIp) {
         if (!BuildConfig.LOCAL_WEBHMI_ENABLED || !localStarting.compareAndSet(false, true))
             return;
         localServerStatus.setText("Uruchamianie i uwierzytelniona kontrola WebHMI…");
@@ -182,7 +242,8 @@ public final class MainActivity extends Activity {
             LocalWebHmiClient.StartResult ready = null;
             String problem = null;
             try {
-                ready = LocalWebHmiClient.start(getApplicationContext());
+                ready = LocalWebHmiClient.start(
+                        getApplicationContext(), requestedIp, changeWifiMode);
             } catch (Throwable failure) {
                 problem = failure.getClass().getSimpleName() + ": "
                         + String.valueOf(failure.getMessage());
@@ -201,6 +262,14 @@ public final class MainActivity extends Activity {
                     return;
                 }
                 localSessionToken = result.token;
+                activeWifiIp = result.wifiIp;
+                if (wifiShare != null) wifiShare.setChecked(!activeWifiIp.isEmpty());
+                if (wifiAddress != null) {
+                    wifiAddress.setText(activeWifiIp.isEmpty()
+                            ? "Tylko na telefonie: http://127.0.0.1:8765/"
+                            : "Inne urządzenia w tym Wi-Fi: " + result.wifiUrl()
+                            + " (HTTP bez szyfrowania; wymagany token)");
+                }
                 String hosting;
                 try {
                     LocalServerService.retain(this);
@@ -226,6 +295,9 @@ public final class MainActivity extends Activity {
             return;
         }
         localSessionToken = null;
+        activeWifiIp = "";
+        if (wifiShare != null) wifiShare.setChecked(false);
+        if (wifiAddress != null) wifiAddress.setText("Udostępnianie wyłączone.");
         closeServer("Zamykanie lokalnej sesji");
         localServerStatus.setText("Zatrzymywanie serwera…");
         new Thread(() -> {
@@ -304,7 +376,12 @@ public final class MainActivity extends Activity {
         }
         connected = true;
         status.setText("Łączenie z " + url.getHost() + " — token wpisz na stronie WebHMI.");
-        web.loadUrl(url.toString());
+        if (web != null && web.getVisibility() == View.VISIBLE) {
+            web.loadUrl(url.toString());
+        } else {
+            status.setText("Serwer gotowy: " + url + " Otwórz w przeglądarce "
+                    + "lub zaznacz panel wewnątrz aplikacji.");
+        }
     }
 
     private void maybeOpenSecureRemote() {
@@ -317,6 +394,57 @@ public final class MainActivity extends Activity {
         address.setText(secure.toString());
         allowLocalHttp.setChecked(false);
         openServer(); // no automatic authentication or CNC commands
+    }
+
+    private void openLocalBrowser() {
+        if (localSessionToken == null) {
+            status.setText("Uruchom lokalny serwer przed otwarciem przeglądarki.");
+            return;
+        }
+        try {
+            android.content.Intent browser = new android.content.Intent(
+                    android.content.Intent.ACTION_VIEW,
+                    android.net.Uri.parse(LocalWebHmiClient.LOCAL_URL));
+            startActivity(browser);
+            status.setText("Panel w przeglądarce telefonu. Wklej token po skopiowaniu.");
+        } catch (RuntimeException unavailable) {
+            status.setText("Nie można otworzyć przeglądarki: "
+                    + unavailable.getClass().getSimpleName());
+        }
+    }
+
+    private void copyLocalToken() {
+        if (localSessionToken == null || localSessionToken.isEmpty()) {
+            status.setText("Brak aktywnego tokenu lokalnego serwera.");
+            return;
+        }
+        android.content.ClipboardManager cb = (android.content.ClipboardManager)
+                getSystemService(Context.CLIPBOARD_SERVICE);
+        if (cb == null) return;
+        android.content.ClipData clip = android.content.ClipData.newPlainText(
+                "linumeRT token", localSessionToken);
+        if (Build.VERSION.SDK_INT >= 33) {
+            android.os.PersistableBundle extras = new android.os.PersistableBundle();
+            extras.putBoolean(android.content.ClipDescription.EXTRA_IS_SENSITIVE, true);
+            clip.getDescription().setExtras(extras);
+        }
+        cb.setPrimaryClip(clip);
+        status.setText("Token skopiowany. Nie wysyłaj go nieznanym osobom. "
+                + "Przez HTTP w Wi-Fi token i polecenia nie są szyfrowane.");
+    }
+
+    private void copyWifiUrl() {
+        if (activeWifiIp.isEmpty()) {
+            status.setText("Najpierw włącz udostępnianie przez Wi-Fi.");
+            return;
+        }
+        android.content.ClipboardManager cb = (android.content.ClipboardManager)
+                getSystemService(Context.CLIPBOARD_SERVICE);
+        if (cb != null) {
+            cb.setPrimaryClip(android.content.ClipData.newPlainText("linumeRT WebHMI URL",
+                    "http://" + activeWifiIp + ":8765/"));
+            status.setText("Skopiowano adres WebHMI do udostępnienia w tej sieci Wi-Fi.");
+        }
     }
 
     private void closeServer(String reason) {
