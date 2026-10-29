@@ -1,7 +1,10 @@
 # linumeRT WebHMI — Android APK
 
-Natywny klient Android WebView (Java, bez zależności aplikacji). **APK nie uruchamia LinuxCNC
-na telefonie:** jest klientem serwera WebHMI działającego na komputerze CNC/symulatorze.
+Natywny klient Android WebView (Java) z eksperymentalnym interpreterem CPython przez Chaquopy.
+**APK nadal nie uruchamia LinuxCNC ani serwera WebHMI na telefonie:** w tej gałęzi jedynie
+sprawdza automatycznie lokalny runtime Pythona na \`127.0.0.1:8766/probe\`. Serwer WebHMI
+na \`127.0.0.1:8765\` i symulacja FakeBackend to następny, osobno weryfikowany etap.
+Szczegóły: [plan autonomicznego runtime](MOBILE_RUNTIME_ROADMAP.md).
 
 ## Pobranie i instalacja APK
 1. Otwórz [Android WebHMI APK — GitHub Actions](https://github.com/kubus323f/linumeRT_GPT/actions/workflows/android-apk.yml).
@@ -45,7 +48,8 @@ Uwaga: \`--host 0.0.0.0\` może kolidować z kontrolą Host; używaj konkretnego
 - GPL-2.0-or-later.
 
 ## Kompilacja lokalna (opcjonalnie)
-JDK 17, Android SDK 35, Build Tools 35.0.0, Gradle 8.11.1:
+JDK 17, Python 3.11 na maszynie kompilującej, Android SDK 35, Build Tools 35.0.0,
+Gradle 8.11.1, Chaquopy 17.2.0 pobierane przez Gradle:
 \`\`\`bash
 cd android/webhmi
 gradle :app:assembleDebug
