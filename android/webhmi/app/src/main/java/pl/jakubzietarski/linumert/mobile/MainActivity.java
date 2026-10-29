@@ -199,8 +199,17 @@ public final class MainActivity extends Activity {
                     return;
                 }
                 localSessionToken = result.token;
+                String hosting;
+                try {
+                    LocalServerService.retain(this);
+                    hosting = "Usługa w tle: uruchomiona (trwałość zależy od systemu).";
+                } catch (RuntimeException denied) {
+                    hosting = "Usługa w tle niedostępna: " +
+                            denied.getClass().getSimpleName() + ".";
+                }
                 localServerStatus.setText(
-                        "PASS: WebHMI 127.0.0.1:8765, symulacja bez sterowania sprzętem.");
+                        "PASS: WebHMI 127.0.0.1:8765, symulacja bez sterowania sprzętem. "
+                        + hosting);
                 address.setText(result.address);
                 allowLocalHttp.setChecked(true);
                 openServer();
@@ -225,6 +234,12 @@ public final class MainActivity extends Activity {
                 outcome = "STOP_FAILED_" + failure.getClass().getSimpleName();
             }
             final String report = outcome;
+            if ("STOPPED".equals(report)) {
+                try {
+                    stopService(new android.content.Intent(getApplicationContext(),
+                            LocalServerService.class));
+                } catch (RuntimeException ignored) { }
+            }
             runOnUiThread(() -> {
                 if (!isFinishing() && !isDestroyed())
                     localServerStatus.setText("Serwer lokalny: " + report);
