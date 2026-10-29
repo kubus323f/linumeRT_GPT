@@ -41,7 +41,7 @@ android {
 // Stage 1: CPython loopback diagnostic only. No machine-control backend is bundled.
 chaquopy {
     defaultConfig {
-        version '3.11'
+        version '3.13'
         if (fullWebHmi) {
             // This build is deliberately strict: no substitute for a verified Android wheel.
             pip {
