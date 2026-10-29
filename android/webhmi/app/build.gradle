@@ -5,8 +5,7 @@ plugins {
 
 // Opt-in experiment; standard APK remains a functional remote client even when
 // Android wheels for pydantic-core are unavailable.
-def fullWebHmi = providers.gradleProperty("linumertFullWebHmi")
-    .map { it.toBoolean() }.getOrElse(false)
+def fullWebHmi = providers.gradleProperty("linumertFullWebHmi").map { it.toBoolean() }.getOrElse(false)
 
 android {
     buildFeatures {
