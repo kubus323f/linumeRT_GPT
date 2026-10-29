@@ -283,7 +283,14 @@ public final class MainActivity extends Activity {
                 }
                 String hosting;
                 try {
-                    LocalServerService.retain(this);
+                    LocalServerService.retain(this, activeWifiIp);
+                    if (Build.VERSION.SDK_INT >= 33
+                            && checkSelfPermission(
+                                android.Manifest.permission.POST_NOTIFICATIONS)
+                                != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                        requestPermissions(new String[]{
+                                android.Manifest.permission.POST_NOTIFICATIONS}, 8765);
+                    }
                     hosting = "Usługa w tle: uruchomiona (trwałość zależy od systemu).";
                 } catch (RuntimeException denied) {
                     hosting = "Usługa w tle niedostępna: " +
