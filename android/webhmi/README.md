@@ -1,10 +1,30 @@
 # linumeRT WebHMI — Android APK
 
 Natywny klient Android WebView (Java) z eksperymentalnym interpreterem CPython przez Chaquopy.
-**APK nadal nie uruchamia LinuxCNC ani serwera WebHMI na telefonie:** w tej gałęzi jedynie
-sprawdza automatycznie lokalny runtime Pythona na \`127.0.0.1:8766/probe\`. Serwer WebHMI
-na \`127.0.0.1:8765\` i symulacja FakeBackend to następny, osobno weryfikowany etap.
+**Wariant standardowy** nie uruchamia LinuxCNC ani serwera WebHMI na telefonie:
+sprawdza lokalny runtime Pythona na \`127.0.0.1:8766/probe\`. **Wariant eksperymentalny**
+zawiera kod uruchamiania serwera WebHMI na \`127.0.0.1:8765\`, ale jego zgodność i kompilacja
+na Androidzie nie zostały jeszcze potwierdzone.
 Szczegóły: [plan autonomicznego runtime](MOBILE_RUNTIME_ROADMAP.md).
+
+## Warianty wykonawcze
+
+- Standardowy `assembleDebug`: wbudowany Python 3.11 i diagnostyczny lokalny
+  serwer `127.0.0.1:8766/probe`. Nie jest to serwer WebHMI.
+- Eksperymentalny `assembleDebug -PlinumertFullWebHmi=true`: próba spakowania
+  istniejących źródeł `linumert` i `linumert_webhmi`, FastAPI, Uvicorn,
+  WebSockets i Pydantic. Po uruchomieniu aplikacja próbuje wystartować
+  `FakeBackend` na `127.0.0.1:8765`, potwierdza endpointy
+  `/api/health` i uwierzytelniony `/api/state`, a dopiero potem otwiera panel.
+  Komunikat błędu pozostawia możliwość połączenia z serwerem zdalnym.
+
+Wariant eksperymentalny **nie jest jeszcze skompilowany ani przetestowany na
+Androidzie 16**. Androidowe koła binarne (`wheels`) pakietu `pydantic-core`
+muszą być zgodne z Chaquopy, wersją Pythona i rozmiarem stron pamięci.
+Plików binarnych Linuksa nie należy instalować w ich miejsce.
+
+Serwer nie uruchamia LinuxCNC na telefonie i nie zastępuje sterownika
+ruchu. Autonomiczna usługa działająca w tle oraz PRoot są kolejnymi etapami.
 
 ## Pobranie i instalacja APK
 1. Otwórz [Android WebHMI APK — GitHub Actions](https://github.com/kubus323f/linumeRT_GPT/actions/workflows/android-apk.yml).
