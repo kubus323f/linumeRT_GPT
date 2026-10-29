@@ -11,6 +11,12 @@ import android.content.Intent;
 import android.content.pm.ServiceInfo;
 import android.os.Build;
 import android.os.IBinder;
+import android.net.ConnectivityManager;
+import android.net.LinkAddress;
+import android.net.LinkProperties;
+import android.net.Network;
+import android.net.NetworkCapabilities;
+import android.net.NetworkRequest;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -26,6 +32,9 @@ public final class LocalServerService extends Service {
     private static final String CHANNEL = "linumert_local_webhmi";
     private static final int NOTIFICATION_ID = 8765;
     private final AtomicBoolean stopping = new AtomicBoolean(false);
+    private ConnectivityManager connectivity;
+    private ConnectivityManager.NetworkCallback wifiCallback;
+    private volatile Network approvedWifiNetwork;
 
     static void retain(Context context, String wifiIp) {
         Intent intent = new Intent(context, LocalServerService.class);
@@ -104,6 +113,82 @@ public final class LocalServerService extends Service {
         } else {
             startForeground(NOTIFICATION_ID, notification);
         }
+        watchApprovedWifi(approvedWifi);
         return START_NOT_STICKY;
+    }
+
+    private void watchApprovedWifi(String ip) {
+        unwatchWifi();
+        if (ip.isEmpty()) return;
+        Network selected = WifiInterface.networkForPrivateIpv4(this, ip);
+        if (selected == null) {
+            revokeOnNetworkLoss();
+            return;
+        }
+        approvedWifiNetwork = selected;
+        connectivity = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+        if (connectivity == null) {
+            revokeOnNetworkLoss();
+            return;
+        }
+        final Network approved = selected;
+        wifiCallback = new ConnectivityManager.NetworkCallback() {
+            @Override
+            public void onLost(Network network) {
+                if (approved.equals(network)
+                        && approved.equals(approvedWifiNetwork)) revokeOnNetworkLoss();
+            }
+
+            @Override
+            public void onLinkPropertiesChanged(Network network, LinkProperties properties) {
+                if (!approved.equals(network) || !approved.equals(approvedWifiNetwork))
+                    return;
+                boolean stillHasAddress = false;
+                for (LinkAddress address : properties.getLinkAddresses()) {
+                    if (ip.equals(address.getAddress().getHostAddress())) {
+                        stillHasAddress = true;
+                        break;
+                    }
+                }
+                if (!stillHasAddress) revokeOnNetworkLoss();
+            }
+        };
+        try {
+            connectivity.registerNetworkCallback(new NetworkRequest.Builder()
+                    .addTransportType(NetworkCapabilities.TRANSPORT_WIFI).build(), wifiCallback);
+        } catch (RuntimeException denied) {
+            revokeOnNetworkLoss();
+        }
+    }
+
+    private void revokeOnNetworkLoss() {
+        if (!stopping.compareAndSet(false, true)) return;
+        // Fail closed: no listener persists on a different Wi-Fi with the same IP.
+        new Thread(() -> {
+            try {
+                LocalWebHmiClient.stop();
+            } catch (RuntimeException ignored) {
+                // Process is still stopped as a foreground service; no false PASS.
+            } finally {
+                stopForeground(STOP_FOREGROUND_REMOVE);
+                stopSelf();
+            }
+        }, "linumert-wifi-revocation").start();
+    }
+
+    private void unwatchWifi() {
+        approvedWifiNetwork = null;
+        if (connectivity != null && wifiCallback != null) {
+            try {
+                connectivity.unregisterNetworkCallback(wifiCallback);
+            } catch (RuntimeException ignored) { }
+        }
+        wifiCallback = null;
+    }
+
+    @Override
+    public void onDestroy() {
+        unwatchWifi();
+        super.onDestroy();
     }
 }
