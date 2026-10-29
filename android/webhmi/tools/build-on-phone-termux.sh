@@ -9,13 +9,26 @@ REPOSITORY="https://github.com/kubus323f/linumeRT_GPT.git"
 BASE="/sdcard/Download"
 STAMP="$(date +%Y%m%d_%H%M%S)"
 OUT="$BASE/linumert-mobile-build-$STAMP"
-WORK="$HOME/.cache/linumert-mobile-build"
+# The old cache may have a local branch which diverged after a forced remote update.
+# Treat it as read-only source cache and NEVER merge/reset or discard its history.
+CACHE="$HOME/.cache/linumert-mobile-build"
+WORK="$HOME/.cache/linumert-mobile-build-runs/$STAMP"
+SOURCE_WORKTREE_CREATED=0
 LOG="$OUT/build.log"
 mkdir -p "$OUT"
 exec > >(tee -a "$LOG") 2>&1
 completed=0
 finish() {
     code=$?
+    # A disposable worktree is unique to this build and contains no user code.
+    # Keep the old cache (including any divergent local commits) unchanged.
+    if [ "$SOURCE_WORKTREE_CREATED" -eq 1 ]; then
+        if git -C "$CACHE" worktree remove --force "$WORK" >/dev/null 2>&1; then
+            echo "Usunieto tymczasowa kopie kompilacji, zachowano cache Git."
+        else
+            echo "OSTRZEZENIE: nie udalo sie zwolnic tymczasowego worktree $WORK."
+        fi
+    fi
     if [ "$completed" -eq 1 ] && [ "$code" -eq 0 ]; then
         echo "PASS" > "$OUT/STATUS.txt"
         echo "Wynik: PASS | $OUT"
@@ -75,26 +88,35 @@ export ANDROID_HOME="$SDK"
 export ANDROID_SDK_ROOT="$SDK"
 echo "SDK: $SDK"
 
-mkdir -p "$(dirname "$WORK")"
-if [ ! -d "$WORK/.git" ]; then
-    if [ -e "$WORK" ]; then
-        echo "ERROR: $WORK istnieje i nie jest repozytorium Git; nie nadpisuje go."
+mkdir -p "$(dirname "$CACHE")" "$(dirname "$WORK")"
+if [ ! -d "$CACHE/.git" ]; then
+    if [ -e "$CACHE" ]; then
+        echo "ERROR: $CACHE istnieje, ale nie zawiera repozytorium Git; nie nadpisuje."
         exit 5
     fi
-    git clone --depth=1 --branch="$BRANCH" --single-branch "$REPOSITORY" "$WORK"
+    # Avoid downloading the same branch and its source tree in every build run.
+    git clone --no-checkout --depth=1 --single-branch --branch="$BRANCH" "$REPOSITORY" "$CACHE"
 else
-    case "$(git -C "$WORK" remote get-url origin)" in
+    case "$(git -C "$CACHE" remote get-url origin)" in
         "$REPOSITORY"|"https://github.com/kubus323f/linumeRT_GPT") ;;
-        *) echo "ERROR: Nieoczekiwane repozytorium w katalogu roboczym"; exit 5 ;;
+        *) echo "ERROR: Nieznane repozytorium w cache Git; nie dotykam danych."; exit 5 ;;
     esac
-    if [ -n "$(git -C "$WORK" status --porcelain --untracked-files=no)" ]; then
-        echo "ERROR: Lokalne zmiany w repozytorium; nie nadpisuje ich."
-        exit 5
-    fi
-    git -C "$WORK" fetch --depth=1 origin "$BRANCH"
-    git -C "$WORK" checkout "$BRANCH"
-    git -C "$WORK" merge --ff-only FETCH_HEAD
 fi
+echo "=== FETCH IMMUTABLE BUILD SNAPSHOT ==="
+# Explicit plus sign only updates the remote tracking ref. It does NOT change
+# the local branch, any working files or local commits in the old cache.
+git -C "$CACHE" fetch --depth=1 origin \
+    "+refs/heads/$BRANCH:refs/remotes/origin/$BRANCH"
+SOURCE_COMMIT="$(git -C "$CACHE" rev-parse --verify "refs/remotes/origin/$BRANCH^{commit}")"
+git -C "$CACHE" cat-file -e "$SOURCE_COMMIT^{commit}"
+if [ -e "$WORK" ]; then
+    echo "ERROR: Katalog sesji juz istnieje: $WORK. Nie nadpisuje."
+    exit 5
+fi
+# Detached worktree accepts a rewritten GitHub history without merging or reset.
+# It is isolated from the existing local branch and can safely be discarded.
+git -C "$CACHE" worktree add --detach "$WORK" "$SOURCE_COMMIT"
+SOURCE_WORKTREE_CREATED=1
 git -C "$WORK" rev-parse HEAD | tee "$OUT/source-commit.txt"
 printf 'sdk.dir=%s\n' "$SDK" > "$WORK/android/webhmi/local.properties"
 
