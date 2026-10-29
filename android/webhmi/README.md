@@ -3,8 +3,7 @@
 Natywny klient Android WebView (Java) z eksperymentalnym interpreterem CPython przez Chaquopy.
 **Wariant standardowy** nie uruchamia LinuxCNC ani serwera WebHMI na telefonie:
 sprawdza lokalny runtime Pythona na \`127.0.0.1:8766/probe\`. **Wariant eksperymentalny**
-zawiera kod uruchamiania serwera WebHMI na \`127.0.0.1:8765\`, ale jego zgodność i kompilacja
-na Androidzie nie zostały jeszcze potwierdzone.
+uruchamia symulacyjny WebHMI na lokalnym adresie 127.0.0.1:8765.
 Szczegóły: [plan autonomicznego runtime](MOBILE_RUNTIME_ROADMAP.md).
 
 ## Warianty wykonawcze
@@ -18,8 +17,7 @@ Szczegóły: [plan autonomicznego runtime](MOBILE_RUNTIME_ROADMAP.md).
   `/api/health` i uwierzytelniony `/api/state`, a dopiero potem otwiera panel.
   Komunikat błędu pozostawia możliwość połączenia z serwerem zdalnym.
 
-Wariant eksperymentalny **nie jest jeszcze skompilowany ani przetestowany na
-Androidzie 16**. Zamiast zależeć od natywnego `pydantic-core` używa kompatybilnego
+Poprzedni wariant dev2 **został skompilowany i uruchomiony na Androidzie 16**,\nco potwierdza zrzut ekranu operatora i komunikaty lokalnych usług. Nowy\nwariant dev3 z przeglądarką i Wi-Fi **wymaga osobnej weryfikacji na urządzeniu**. Zamiast zależeć od natywnego `pydantic-core` używa kompatybilnego
 z FastAPI Pydantic 1.10.24 (pakiet pure Python). Pozostałe wymagania pakietowe
 muszą zostać sprawdzone w rzeczywistej kompilacji Chaquopy.
 
@@ -53,7 +51,7 @@ nowe WebHMI. Zapisuje `build.log`, SHA-256, `launch.txt`, `health.json` (gdy
 serwer odpowiada). Lokalny debug keystore musi pozostać bezpiecznie zachowany,
 aby kolejne aktualizacje tej samej wersji preview miały ten sam podpis.
 
-## Pobranie i instalacja APK
+## Panel w przeglądarce i udostępnianie w Wi-Fi\n\nPatrz [instrukcja dostępu sieciowego](WIFI_BROWSER_ACCESS.md). Wariant dev3\ndodaje otwarcie panelu w domyślnej przeglądarce, kopiowanie tokenu, a po\nświadomym włączeniu także nasłuch na lokalnym adresie aktualnej sieci Wi-Fi.\nNie uruchamia fizycznego sterownika CNC.\n\n## Pobranie i instalacja APK
 1. Otwórz [Android WebHMI APK — GitHub Actions](https://github.com/kubus323f/linumeRT_GPT/actions/workflows/android-apk.yml).
 2. Wybierz pomyślny przebieg \`Android WebHMI APK\` i pobierz artefakt \`linumeRT-WebHMI-Android16-APK\`.
 3. Rozpakuj pobrany ZIP i otwórz \`app-debug.apk\` na telefonie; Android może poprosić o jednorazowe
