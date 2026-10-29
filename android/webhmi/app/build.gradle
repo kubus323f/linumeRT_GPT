@@ -47,8 +47,8 @@ chaquopy {
             pip {
                 install 'fastapi==0.115.6'
                 install 'uvicorn==0.34.0'
-                install 'websockets==14.2'
-                install 'pydantic==2.10.6'
+                install 'wsproto==1.2.0'
+                install 'pydantic==1.10.24'
             }
             extractPackages("linumert_webhmi")
         }
