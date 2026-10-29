@@ -228,12 +228,12 @@ expected = sys.argv[2]
 data = json.loads(p.read_text(encoding="utf-8"))
 actual = data.get("applicationId")
 versions = [x.get("versionCode") for x in data.get("elements", [])]
-if actual != expected or versions != [2]:
-    raise SystemExit(f"ERROR: odmowa instalacji APK: expected {expected} v2, got {actual} {versions}")
-print(f"PASS: bezpieczna odrebna tozsamosc APK: {actual} v2")
+if actual != expected or versions != [3]:
+    raise SystemExit(f"ERROR: odmowa instalacji APK: expected {expected} v3, got {actual} {versions}")
+print(f"PASS: bezpieczna odrebna tozsamosc APK: {actual} v3")
 PY
 cp "$METADATA" "$OUT/output-metadata.json"
-PREVIEW_APK="$OUT/linumeRT-Mobile-preview-dev2.apk"
+PREVIEW_APK="$OUT/linumeRT-Mobile-preview-dev3.apk"
 cp "$APK" "$PREVIEW_APK"
 sha256sum "$PREVIEW_APK" | tee "$OUT/SHA256.txt"
 echo "APK: $PREVIEW_APK"
