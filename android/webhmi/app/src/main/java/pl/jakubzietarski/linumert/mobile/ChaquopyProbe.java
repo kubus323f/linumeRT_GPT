@@ -45,8 +45,18 @@ final class ChaquopyProbe {
                     || data.optInt("schema",-1) != 0) {
                 throw new IllegalStateException("PROBE_INVALID");
             }
-            return "PASS: Python " + data.optString("python") + ", loopback 127.0.0.1:8766. "
-                 + "Serwer WebHMI jeszcze nie został uruchomiony.";
+            long pageSize;
+            try {
+                pageSize = android.system.Os.sysconf(
+                        android.system.OsConstants._SC_PAGESIZE);
+            } catch (Exception notAvailable) {
+                pageSize = -1;
+            }
+            return "PASS: Python " + data.optString("python")
+                    + ", CPU ABI=" + android.os.Build.SUPPORTED_ABIS[0]
+                    + ", strona pamięci=" + pageSize + " B"
+                    + ", loopback 127.0.0.1:8766. "
+                    + "Serwer WebHMI jeszcze nie został uruchomiony.";
         } finally {
             connection.disconnect();
         }
