@@ -13,7 +13,7 @@ class PreviewIdentityTests(unittest.TestCase):
         build = BUILD.read_text(encoding="utf-8")
         self.assertIn("applicationId 'pl.jakubzietarski.linumert.mobile'", build)
         self.assertIn("applicationIdSuffix '.preview'", build)
-        self.assertIn("versionCode 2", build)
+        self.assertIn("versionCode 3", build)
         self.assertIn("debug {", build)
 
     def test_debug_app_has_visible_different_name(self):
@@ -24,7 +24,7 @@ class PreviewIdentityTests(unittest.TestCase):
         script = RUN.read_text(encoding="utf-8")
         self.assertIn('PREVIEW_PACKAGE="pl.jakubzietarski.linumert.mobile.preview"', script)
         self.assertIn('output-metadata.json', script)
-        self.assertIn('if actual != expected or versions != [2]:', script)
+        self.assertIn('if actual != expected or versions != [3]:', script)
         self.assertIn('adb -s 127.0.0.1:5555 install -r "$PREVIEW_APK"', script)
         self.assertNotIn('adb -s 127.0.0.1:5555 uninstall', script)
         self.assertNotIn('pm uninstall', script)
