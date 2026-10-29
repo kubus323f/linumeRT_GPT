@@ -146,7 +146,8 @@ public final class MainActivity extends Activity {
         web.setWebViewClient(new GuardedClient());
         root.addView(web, new LinearLayout.LayoutParams(-1, 0, 1));
         web.loadUrl("about:blank");
-        checkEmbeddedRuntime();
+        if (BuildConfig.LOCAL_WEBHMI_ENABLED) checkEmbeddedRuntime();
+        else maybeOpenSecureRemote();
     }
 
     private void checkEmbeddedRuntime() {
@@ -195,7 +196,8 @@ public final class MainActivity extends Activity {
                 if (result == null) {
                     localSessionToken = null;
                     localServerStatus.setText("Serwer lokalny NIEGOTOWY: " + error
-                            + ". Zdalny serwer nadal jest dostępny.");
+                            + ". Próbuję zapamiętane bezpieczne połączenie zdalne.");
+                    maybeOpenSecureRemote();
                     return;
                 }
                 localSessionToken = result.token;
@@ -289,6 +291,12 @@ public final class MainActivity extends Activity {
             localSessionToken = null;
         if (!LocalWebHmiClient.LOCAL_URL.equals(url.toString()))
             prefs.edit().putString("server_url", url.toString()).apply();
+        if (!LocalWebHmiClient.LOCAL_URL.equals(url.toString())
+                && "https".equalsIgnoreCase(url.getScheme())) {
+            // Only previously user-selected HTTPS endpoints are eligible for
+            // silent fallback. No credentials or local insecure URLs are saved.
+            prefs.edit().putString("remote_server_url", url.toString()).apply();
+        }
         InputMethodManager keyboard = (InputMethodManager) getSystemService(
                 Context.INPUT_METHOD_SERVICE);
         if (keyboard != null) {
@@ -297,6 +305,18 @@ public final class MainActivity extends Activity {
         connected = true;
         status.setText("Łączenie z " + url.getHost() + " — token wpisz na stronie WebHMI.");
         web.loadUrl(url.toString());
+    }
+
+    private void maybeOpenSecureRemote() {
+        String configured = prefs.getString("remote_server_url", "");
+        URI secure = ServerUrlPolicy.parse(configured, false);
+        MobileRuntimePolicy.Backend choice = MobileRuntimePolicy.select(
+                MobileRuntimePolicy.Purpose.SIMULATION, true,
+                false, false, secure != null);
+        if (choice != MobileRuntimePolicy.Backend.REMOTE) return;
+        address.setText(secure.toString());
+        allowLocalHttp.setChecked(false);
+        openServer(); // no automatic authentication or CNC commands
     }
 
     private void closeServer(String reason) {
