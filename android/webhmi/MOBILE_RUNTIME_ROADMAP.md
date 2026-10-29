@@ -69,3 +69,11 @@ for any missing Android-native dependency.
 - APK update signing: pinned stable certificate and continuity with installed debug APK NOT SOLVED.
 - S3 PRoot: NOT IMPLEMENTED.
 - Real hardware control: OUT OF SCOPE.
+
+## 2026-10-29 device build: signer mismatch resolved non-destructively
+- Device build with ARM64 aapt2 reached installation of the experimental APK, but Android rejected an in-place update due to `INSTALL_FAILED_UPDATE_INCOMPATIBLE`.
+- The new debug build uses a separate application ID `.mobile.preview`, leaving the original `.mobile` package and data intact.
+- The installer refuses to install unless Gradle's `output-metadata.json` matches the preview ID and versionCode 2.
+- After installation, a diagnostic launch and loopback health probe are attempted. A successful APK install is never treated as proven WebHMI operation.
+- A future in-place migration to the original package requires its original signing key; no unattended uninstall or destructive data migration.
+- On-device installation and runtime smoke results for the new preview are still PENDING.
