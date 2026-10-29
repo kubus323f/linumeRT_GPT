@@ -97,7 +97,7 @@ Uwaga: \`--host 0.0.0.0\` może kolidować z kontrolą Host; używaj konkretnego
 - GPL-2.0-or-later.
 
 ## Kompilacja lokalna (opcjonalnie)
-JDK 17, Python 3.11 na maszynie kompilującej, Android SDK 35, Build Tools 35.0.0,
+JDK 17 lub nowszy, Python 3.13 na urządzeniu kompilującym, Android SDK 35, Build Tools 35.0.0,
 Gradle 8.11.1, Chaquopy 17.2.0 pobierane przez Gradle:
 \`\`\`bash
 cd android/webhmi
